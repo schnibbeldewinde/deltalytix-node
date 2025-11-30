@@ -53,7 +53,7 @@ export function PlatformItem({
               alt={platform.logo.alt || ''}
               width={32}
               height={32}
-              className="object-contain rounded-lg border border-border/50 dark:invert"
+              className="platform-logo object-contain rounded-lg border border-border/50"
               loading="lazy"
             />
           )}

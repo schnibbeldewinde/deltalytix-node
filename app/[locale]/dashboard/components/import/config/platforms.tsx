@@ -121,7 +121,7 @@ const AtasLogo = () => (
       alt="ATAS Logo"
       width={32}
       height={32}
-      className="object-contain rounded-lg border border-border/50 dark:invert"
+      className="platform-logo object-contain rounded-lg border border-border/50"
       style={{ width: 'auto', height: '32px', maxWidth: '32px' }}
       loading="lazy"
     />

@@ -402,6 +402,15 @@
   }
 }
 
+@layer base {
+  .platform-logo {
+    background-color: transparent;
+  }
+  .dark .platform-logo {
+    filter: invert(1) brightness(1.2);
+  }
+}
+
 @utility touch-hitbox {
   position: relative;
  
