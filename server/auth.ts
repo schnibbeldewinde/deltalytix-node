@@ -11,12 +11,12 @@ import { AuthSession, AuthUser } from '@/types/auth'
 const SESSION_COOKIE_NAME = 'deltalytix_session'
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7 // 7 days
 const JWT_SECRET = process.env.AUTH_SECRET || 'change-me'
-const cookieSecure =
+const cookieSecure: boolean =
   process.env.COOKIE_SECURE === 'true'
     ? true
     : process.env.COOKIE_SECURE === 'false'
       ? false
-      : process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_VERCEL_URL
+      : !!(process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_VERCEL_URL)
 
 function toAuthUser(user: { id: string; email: string; language?: string; isFirstConnection?: boolean }): AuthUser {
   return {
