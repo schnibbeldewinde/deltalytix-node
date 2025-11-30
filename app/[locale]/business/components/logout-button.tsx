@@ -2,7 +2,7 @@
 
 import { DropdownMenuItem, DropdownMenuShortcut } from "@/components/ui/dropdown-menu"
 import { LogOut } from "lucide-react"
-import { signOut } from "@/server/auth"
+import { signOutClient } from "@/lib/client-auth"
 import { useI18n } from "@/locales/client"
 
 export function LogoutButton() {
@@ -11,7 +11,7 @@ export function LogoutButton() {
   return (
     <DropdownMenuItem 
       onClick={() => {
-        signOut()
+        signOutClient()
       }} 
       className="flex items-center"
     >

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import hotkeys from 'hotkeys-js';
 import { useRouter } from 'next/navigation';
-import { signOut } from '@/server/auth';
+import { signOutClient } from '@/lib/client-auth';
 
 export function useKeyboardShortcuts() {
   const router = useRouter();
@@ -38,7 +38,7 @@ export function useKeyboardShortcuts() {
     // Logout shortcut
     hotkeys('⇧+⌘+q, shift+ctrl+q', (event) => {
       event.preventDefault();
-      signOut();
+      signOutClient();
     });
 
     return () => {

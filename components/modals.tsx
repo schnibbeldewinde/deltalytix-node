@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { useUserStore } from '@/store/user-store'
 import ImportButton from '../app/[locale]/dashboard/components/import/import-button'
 import { useI18n } from "@/locales/client"
-import { signOut } from '@/server/auth'
+import { signOutClient } from '@/lib/client-auth'
 import PricingPlans from '@/components/pricing-plans'
 import { redirect, useSearchParams } from 'next/navigation'
 import { AccountGroupBoard } from '@/app/[locale]/dashboard/components/filters/account-group-board'
@@ -163,7 +163,7 @@ export default function Modals() {
           />
 
           <div className="mt-4 text-center">
-            <Button variant='link' onClick={async()=> await signOut()}>
+            <Button variant='link' onClick={async()=> await signOutClient()}>
               {t('modals.changeAccount')}
             </Button>
           </div>

@@ -3,9 +3,9 @@
 import { useRouter } from 'next/navigation'
 import { createContext, useContext, useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { signOut } from '@/server/auth'
 import { createClient } from '@/lib/supabase'
 import { AuthSession } from '@/types/auth'
+import { signOutClient } from '@/lib/client-auth'
 
 interface AuthContextType {
   isLoading: boolean
@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         toast.error('Session Error', {
           description: 'Failed to check authentication status',
         })
-        await signOut()
+        await signOutClient()
       } finally {
         setIsLoading(false)
       }

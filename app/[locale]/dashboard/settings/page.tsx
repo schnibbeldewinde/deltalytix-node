@@ -26,7 +26,8 @@ import {
   EyeOff,
   Loader2
 } from "lucide-react"
-import { signOut, setPasswordAction } from "@/server/auth"
+import { setPasswordAction } from "@/server/auth"
+import { signOutClient } from "@/lib/client-auth"
 import Link from 'next/link'
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
@@ -540,7 +541,7 @@ export default function SettingsPage() {
                 className="w-full justify-start"
                 onClick={() => {
                   localStorage.removeItem('deltalytix_user_data')
-                  signOut()
+                  signOutClient()
                 }}
               >
                 <LogOut className="mr-2 h-4 w-4" />

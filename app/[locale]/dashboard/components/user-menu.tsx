@@ -35,7 +35,7 @@ import {
   Laptop,
   Settings,
 } from 'lucide-react'
-import { signOut } from '@/server/auth'
+import { signOutClient } from '@/lib/client-auth'
 import { useMemo } from 'react'
 
 type Locale = 'en' | 'fr'
@@ -189,7 +189,7 @@ export default function UserMenu() {
           <DropdownMenuItem
             onClick={() => {
               localStorage.removeItem('deltalytix_user_data')
-              signOut()
+              signOutClient()
             }}
             className="flex items-center"
           >

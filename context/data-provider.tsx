@@ -54,7 +54,8 @@ import {
 } from '@/server/groups';
 import { createClient } from '@/lib/supabase';
 import { prisma } from '@/lib/prisma';
-import { signOut, getUserId, updateUserLanguage } from '@/server/auth';
+import { getUserId, updateUserLanguage } from '@/server/auth';
+import { signOutClient } from '@/lib/client-auth';
 import { DashboardLayoutWithWidgets, useUserStore } from '@/store/user-store';
 import { useTickDetailsStore } from '@/store/tick-details-store';
 import { useFinancialEventsStore } from '@/store/financial-events-store';
@@ -627,7 +628,7 @@ export const DataProvider: React.FC<{
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user?.id) {
-        await signOut();
+        await signOutClient();
         setIsLoading(false)
         return;
       }
@@ -661,7 +662,7 @@ export const DataProvider: React.FC<{
 
 
       if (!data) {
-        await signOut();
+        await signOutClient();
         setIsLoading(false)
         return;
       }
@@ -738,7 +739,7 @@ export const DataProvider: React.FC<{
       const data = await getUserData(true, userId)
 
       if (!data) {
-        await signOut();
+        await signOutClient();
         setIsLoading(false)
         return;
       }
