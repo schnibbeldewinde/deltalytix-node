@@ -1,4 +1,3 @@
-import Image from 'next/image'
 import { useTheme } from '@/context/theme-provider'
 import { useI18n } from '@/locales/client'
 
@@ -19,30 +18,27 @@ export default function Partners() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-12 items-center justify-items-center w-full mt-8">
                     <a className="relative w-full h-[60px] flex items-center justify-center" href="https://account.ninjatrader.com/register?introducingPartner=deltalytix" target="_blank" rel="noopener noreferrer">
-                        <Image
+                        <img
                             src="/logos/ninjatrader-ob.svg"
                             alt="NinjaTrader"
-                            fill
-                            className="object-contain filter dark:brightness-0 dark:invert"
-                            priority
+                            className="object-contain max-h-[60px] filter dark:brightness-0 dark:invert"
+                            loading="lazy"
                         />
                     </a>
                     <a className="relative w-full h-[60px] flex items-center justify-center">
-                        <Image
+                        <img
                             src={effectiveTheme !== 'dark' ? '/logos/etp-b.png' : '/logos/etp-w.png'}
                             alt="Trade Copier by ETP"
-                            fill
-                            className="object-contain"
-                            priority
+                            className="object-contain max-h-[60px]"
+                            loading="lazy"
                         />
                     </a>
                     <a className="relative w-full h-[60px] flex items-center justify-center">
-                        <Image
+                        <img
                             src={effectiveTheme === 'dark' ? '/logos/rithmic-logo-white.png' : '/logos/rithmic-logo-black.png'}
                             alt="Rithmic"
-                            fill
-                            className="object-contain"
-                            priority
+                            className="object-contain max-h-[60px]"
+                            loading="lazy"
                         />
                     </a>
                 </div>

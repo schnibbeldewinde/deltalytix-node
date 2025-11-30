@@ -1,7 +1,6 @@
 "use client";
 
 import React, { forwardRef, useRef } from "react";
-import Image from "next/image";
 import { Logo } from "@/components/logo";
 
 import { cn } from "@/lib/utils";
@@ -44,29 +43,29 @@ export function ImportFeature() {
       <div className="flex size-full max-h-[200px] max-w-lg flex-col items-stretch justify-between gap-10">
         <div className="flex flex-row items-center justify-between">
           <Circle ref={div1Ref}>
-            <Image src="/logos/tradovate.png" alt="Tradovate" width={24} height={24} />
+            <img src="/logos/tradovate.png" alt="Tradovate" width={24} height={24} loading="lazy" />
           </Circle>
           <Circle ref={div5Ref}>
-            <Image src="/logos/topstep.png" alt="Topstep" width={24} height={24} />
+            <img src="/logos/topstep.png" alt="Topstep" width={24} height={24} loading="lazy" />
           </Circle>
         </div>
         <div className="flex flex-row items-center justify-between">
           <Circle ref={div2Ref}>
-            <Image src="/logos/ninjatrader.png" alt="NinjaTrader" width={24} height={24} />
+            <img src="/logos/ninjatrader.png" alt="NinjaTrader" width={24} height={24} loading="lazy" />
           </Circle>
           <Circle ref={div4Ref} className="size-16">
             <Logo className="size-8" />
           </Circle>
           <Circle ref={div6Ref}>
-            <Image src="/logos/quantower.png" alt="Quantower" width={24} height={24} />
+            <img src="/logos/quantower.png" alt="Quantower" width={24} height={24} loading="lazy" />
           </Circle>
         </div>
         <div className="flex flex-row items-center justify-between">
           <Circle ref={div3Ref}>
-            <Image src="/logos/rithmic.png" alt="Rithmic" width={24} height={24} />
+            <img src="/logos/rithmic.png" alt="Rithmic" width={24} height={24} loading="lazy" />
           </Circle>
           <Circle ref={div7Ref}>
-            <Image src="/logos/etp.png" alt="Thor" width={24} height={24} />
+            <img src="/logos/etp.png" alt="Thor" width={24} height={24} loading="lazy" />
           </Circle>
         </div>
       </div>
