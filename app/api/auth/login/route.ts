@@ -6,6 +6,12 @@ import { prisma } from "@/lib/prisma"
 const SESSION_COOKIE_NAME = 'deltalytix_session'
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7 // 7 days
 const JWT_SECRET = process.env.AUTH_SECRET || 'change-me'
+const cookieSecure =
+  process.env.COOKIE_SECURE === 'true'
+    ? true
+    : process.env.COOKIE_SECURE === 'false'
+      ? false
+      : process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_VERCEL_URL
 
 export async function POST(req: Request) {
   try {
@@ -35,7 +41,7 @@ export async function POST(req: Request) {
     const res = NextResponse.json({ success: true })
     res.cookies.set(SESSION_COOKIE_NAME, token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: cookieSecure,
       sameSite: 'lax',
       path: '/',
       expires: expiresAt,

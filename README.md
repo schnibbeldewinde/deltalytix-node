@@ -127,6 +127,13 @@ If Compose did not inject them for you, set them manually in `.env` or via Compo
 - Mongo runs as a single-node replica set (`rs0`) for Prisma transactions.
 - Data persists in `mongo-data` volume in Compose.
 - For AI features, ensure an OpenAI key is provided (env or Settings). If quota is exceeded, OpenAI will return `insufficient_quota` errors.
+- Delete Mongo-data
+```bash
+docker compose down -v
+```
+```bash
+docker compose down -v
+```
 
 ## License
 This project is provided for self-hosted use. Review included assets and third-party licenses as applicable.

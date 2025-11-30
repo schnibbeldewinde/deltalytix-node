@@ -1,6 +1,5 @@
 'use client'
 
-import Image from "next/image"
 import Link from "next/link"
 
 import { cn } from "@/lib/utils"
@@ -15,10 +14,8 @@ export default function AuthenticationPage() {
   return (
     <div>
       <div className="flex relative h-screen flex-col items-center justify-center md:grid lg:max-w-none lg:grid-cols-2 lg:px-0">
-        <div className="relative hidden h-full flex-col bg-gray-900 p-10 text-white dark:border-r lg:flex">
-          <div className="absolute inset-0 overflow-hidden">
-          <Image src={"/auth-background.jpeg"} width={928} height={1232} className="opacity-35 w-full" alt="Auth abstract image background"></Image>
-          </div>
+        <div className="relative hidden h-full flex-col bg-gradient-to-br from-gray-900 via-slate-800 to-gray-900 p-10 text-white dark:border-r lg:flex">
+          <div className="absolute inset-0 opacity-15 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.15),transparent_40%),radial-gradient(circle_at_80%_10%,rgba(59,130,246,0.25),transparent_35%),radial-gradient(circle_at_50%_70%,rgba(16,185,129,0.25),transparent_35%)]" />
           <div className="relative z-20 flex items-center text-lg font-medium">
             <Link href="/" className="flex items-center gap-2">
               <Logo className="w-10 h-10 fill-white"/>
