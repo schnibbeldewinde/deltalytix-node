@@ -4,7 +4,6 @@ import { Badge } from "@/components/ui/badge"
 import { CommandItem } from "@/components/ui/command"
 import { cn } from "@/lib/utils"
 import { AlertTriangle } from "lucide-react"
-import Image from "next/image"
 import { PlatformConfig } from "../config/platforms"
 import { useI18n } from "@/locales/client"
 
@@ -49,12 +48,13 @@ export function PlatformItem({
       >
         <div className="flex items-center py-1">
           {platform.logo.path && (
-            <Image
+            <img
               src={platform.logo.path}
               alt={platform.logo.alt || ''}
               width={32}
               height={32}
               className="object-contain rounded-lg border border-border/50"
+              loading="lazy"
             />
           )}
           {platform.logo.component && (

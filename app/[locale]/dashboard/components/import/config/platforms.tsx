@@ -27,7 +27,7 @@ import FtmoProcessor from '../ftmo/ftmo-processor'
 import { Step } from '../import-button'
 import { Sparkles } from 'lucide-react'
 import { useTheme } from '@/context/theme-provider'
-import Image from 'next/image'
+// Note: use plain <img> for logos to avoid Next Image optimization issues in certain environments
 
 type TranslationKey =
   | 'import.steps.selectPlatform'
@@ -114,24 +114,19 @@ const FtmoLogo = () => {
 }
 
 // ATAS Logo Component with proper aspect ratio handling
-const AtasLogo = () => {
-  return (
-    <div className="w-8 h-8 flex items-center justify-center">
-      <Image
-        src="/logos/atas.png"
-        alt="ATAS Logo"
-        width={32}
-        height={32}
-        className="object-contain rounded-lg border border-border/50"
-        style={{
-          width: 'auto',
-          height: '32px',
-          maxWidth: '32px'
-        }}
-      />
-    </div>
-  )
-}
+const AtasLogo = () => (
+  <div className="w-8 h-8 flex items-center justify-center">
+    <img
+      src="/logos/atas.png"
+      alt="ATAS Logo"
+      width={32}
+      height={32}
+      className="object-contain rounded-lg border border-border/50"
+      style={{ width: 'auto', height: '32px', maxWidth: '32px' }}
+      loading="lazy"
+    />
+  </div>
+)
 
 type StepComponent =
   | typeof ImportTypeSelection
