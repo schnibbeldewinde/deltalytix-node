@@ -1,7 +1,8 @@
-import { openai } from "@ai-sdk/openai";
+import { createOpenAI } from "@ai-sdk/openai";
 import { streamObject } from "ai";
 import { NextRequest } from "next/server";
 import { mappingSchema } from "./schema";
+import { resolveOpenAIKey } from '@/app/api/ai/utils/resolve-openai-key'
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
@@ -18,6 +19,15 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const apiKey = await resolveOpenAIKey()
+    if (!apiKey) {
+      return new Response(JSON.stringify({ error: 'OpenAI API key is missing. Bitte in den Settings speichern.' }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      })
+    }
+
+    const openai = createOpenAI({ apiKey })
     const result = streamObject({
       model: openai("gpt-4o-mini-2024-07-18"),
       schema: mappingSchema,

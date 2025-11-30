@@ -1,5 +1,3 @@
-
-import { AuthProfileButton } from "../components/auth-profile-button";
 import BusinessNavbar from "../components/business-navbar";
 import { Metadata } from 'next';
 
@@ -30,7 +28,6 @@ export default async function BusinessLayout({
     <div className="px-2 sm:px-6 lg:px-32">
       <div className="flex justify-between items-center py-4">
       <BusinessNavbar />
-      <AuthProfileButton />
       </div>
       <div className="mt-8 sm:mt-20 mx-auto">
         {children}

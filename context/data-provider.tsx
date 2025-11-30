@@ -73,8 +73,6 @@ import { deleteTagAction } from '@/server/tags';
 import { useRouter } from 'next/navigation';
 import { useCurrentLocale } from '@/locales/client';
 import { useMoodStore } from '@/store/mood-store';
-import { useStripeSubscriptionStore } from '@/store/stripe-subscription-store';
-import { getSubscriptionData } from '@/app/[locale]/dashboard/actions/billing';
 
 // Types from trades-data.tsx
 type StatisticsProps = {
@@ -547,11 +545,6 @@ export const DataProvider: React.FC<{
   const isLoading = useUserStore(state => state.isLoading)
   const setIsLoading = useUserStore(state => state.setIsLoading)
 
-  // Stripe subscription store
-  const setStripeSubscription = useStripeSubscriptionStore(state => state.setStripeSubscription);
-  const setStripeSubscriptionLoading = useStripeSubscriptionStore(state => state.setIsLoading);
-  const setStripeSubscriptionError = useStripeSubscriptionStore(state => state.setError);
-
   // Local states
   const [sharedParams, setSharedParams] = useState<SharedParams | null>(null);
 
@@ -640,12 +633,12 @@ export const DataProvider: React.FC<{
       }
 
       setSupabaseUser(user);
+      const userId = user.id;
 
       // CRITICAL: Get dashboard layout first
       // But check if the layout is already in the state
       // TODO: Cache layout client side (lightweight)
       if (!dashboardLayout) {
-        const userId = await getUserId()
         const dashboardLayoutResponse = await getDashboardLayout(userId)
         if (dashboardLayoutResponse) {
           setDashboardLayout(dashboardLayoutResponse as unknown as DashboardLayoutWithWidgets)
@@ -659,12 +652,12 @@ export const DataProvider: React.FC<{
       // Step 2: Fetch trades (with caching server side)
       // I think we could make basic computations server side to offload inital stats computations
       // WE SHOULD NOT USE CLIENT SIDE CACHING FOR TRADES (PREVENTS DATA LEAKAGE / OVERLOAD IN CACHE)
-      const trades = await getTradesAction()
+      const trades = await getTradesAction(userId)
       setTrades(Array.isArray(trades) ? trades : []);
 
       // Step 3: Fetch user data
       // TODO: Check what we could cache client side
-      const data = await getUserData()
+      const data = await getUserData(false, userId)
 
 
       if (!data) {
@@ -708,19 +701,6 @@ export const DataProvider: React.FC<{
     const loadDataIfMounted = async () => {
       if (!mounted) return;
       await loadData();
-      // Load Stripe subscription data
-      try {
-        setStripeSubscriptionLoading(true);
-        const stripeSubscriptionData = await getSubscriptionData();
-        setStripeSubscription(stripeSubscriptionData);
-        setStripeSubscriptionError(null);
-      } catch (error) {
-        console.error('Error loading Stripe subscription:', error);
-        setStripeSubscriptionError(error instanceof Error ? error.message : 'Failed to load subscription');
-        setStripeSubscription(null);
-      } finally {
-        setStripeSubscriptionLoading(false);
-      }
     };
 
     loadDataIfMounted();
@@ -743,20 +723,19 @@ export const DataProvider: React.FC<{
   }, [locale, supabaseUser?.id])
 
   const refreshTrades = useCallback(async () => {
-    if (!supabaseUser?.id) return
+    const userId = supabaseUser?.id
+    if (!userId) return
 
     setIsLoading(true)
 
     try {
       // Get the correct user ID from server
-      const userId = await getUserId()
-
       // Force refresh by calling getTradesAction with forceRefresh: true
       const trades = await getTradesAction(userId, true)
       setTrades(Array.isArray(trades) ? trades : [])
 
       // Also refresh other data with forceRefresh: true
-      const data = await getUserData(true)
+      const data = await getUserData(true, userId)
 
       if (!data) {
         await signOut();
@@ -786,19 +765,6 @@ export const DataProvider: React.FC<{
       console.error('Error refreshing trades:', error)
     } finally {
       setIsLoading(false)
-      // Load Stripe subscription data
-      try {
-        setStripeSubscriptionLoading(true);
-        const stripeSubscriptionData = await getSubscriptionData();
-        setStripeSubscription(stripeSubscriptionData);
-        setStripeSubscriptionError(null);
-      } catch (error) {
-        console.error('Error loading Stripe subscription:', error);
-        setStripeSubscriptionError(error instanceof Error ? error.message : 'Failed to load subscription');
-        setStripeSubscription(null);
-      } finally {
-        setStripeSubscriptionLoading(false);
-      }
     }
   }, [supabaseUser?.id, supabaseUser, locale, setTrades, setUser, setSubscription, setTags, setGroups, setMoods, setEvents, setTickDetails, setAccounts])
 
@@ -974,15 +940,8 @@ export const DataProvider: React.FC<{
   const calendarData = useMemo(() => formatCalendarData(formattedTrades, accounts), [formattedTrades, accounts]);
 
   const isPlusUser = () => {
-    // Use Stripe subscription store for more accurate subscription status
-    const stripeSubscription = useStripeSubscriptionStore.getState().stripeSubscription;
-    if (stripeSubscription) {
-      const planName = stripeSubscription.plan?.name?.toLowerCase() || '';
-      return planName.includes('plus') || planName.includes('pro');
-    }
-
-    // Fallback to database subscription
-    return Boolean(subscription?.status === 'active' && ['plus', 'pro'].includes(subscription?.plan?.split('_')[0].toLowerCase() || ''));
+    // With billing disabled, treat all users as having access
+    return true;
   };
 
 

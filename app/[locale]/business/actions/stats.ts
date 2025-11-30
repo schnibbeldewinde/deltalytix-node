@@ -1,42 +1,19 @@
 'use server'
 
-import { createClient, User } from '@supabase/supabase-js'
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-})
 import { prisma } from '@/lib/prisma'
 
 export async function getUserStats() {
-  let allUsers: any[] = []
-  let page = 1
-  const perPage = 1000
-  let hasMore = true
-
-  while (hasMore) {
-    const { data, error } = await supabase.auth.admin.listUsers({
-      page,
-      perPage
-    })
-
-    if (error) {
-      console.error('Error fetching users:', error)
-      break
-    }
-
-    if (data.users.length === 0) {
-      hasMore = false
-    } else {
-      allUsers = [...allUsers, ...data.users]
-      page++
-    }
-  }
+  const allUsers = await prisma.user.findMany({
+    select: {
+      id: true,
+      email: true,
+      createdAt: true,
+    },
+  })
   
   // Group users by day of creation
   const dailyUsers = allUsers.reduce((acc, user) => {
-    const day = user.created_at.slice(0, 10) // YYYY-MM-DD format
+    const day = (user.createdAt || new Date()).toISOString().slice(0, 10)
     acc[day] = (acc[day] || 0) + 1
     return acc
   }, {} as Record<string, number>)
@@ -55,7 +32,7 @@ export async function getUserStats() {
     allUsers: allUsers.map(user => ({
       id: user.id,
       email: user.email,
-      created_at: user.created_at
+      created_at: user.createdAt?.toISOString() || ''
     }))
   }
 }
@@ -111,35 +88,12 @@ export async function getFreeUsers(){
     .filter(userId => !subscribedUserIds.has(userId))
   console.log(`Found ${freeUserIds.length} free users with trades`)
 
-  // Get user emails from Supabase auth
-  let allUsers: User[] = []
-  let page = 1
-  const perPage = 1000
-  let hasMore = true
-
-  console.log('Starting Supabase user fetch...')
-  while (hasMore) {
-    console.log(`Fetching page ${page} of users...`)
-    const { data, error } = await supabase.auth.admin.listUsers({
-      page,
-      perPage
-    })
-
-    if (error) {
-      console.error('Error fetching users:', error)
-      break
-    }
-
-    if (data.users.length === 0) {
-      console.log('No more users to fetch')
-      hasMore = false
-    } else {
-      console.log(`Retrieved ${data.users.length} users on page ${page}`)
-      allUsers = [...allUsers, ...data.users]
-      page++
-    }
-  }
-  console.log(`Total users fetched from Supabase: ${allUsers.length}`)
+  // Get user emails from database
+  const allUsers = await prisma.user.findMany({
+    where: { id: { in: freeUserIds } },
+    select: { id: true, email: true },
+  })
+  console.log(`Total users fetched from database: ${allUsers.length}`)
 
   // Map free users to their emails and trades
   const mappedUsers = freeUserIds.map(userId => {
@@ -186,18 +140,14 @@ export async function getUserEquityData(page: number = 1, limit: number = 10) {
   // Get the user IDs for this page
   const userIds = usersWithTrades.map(user => user.userId)
 
-  // Get user data from Supabase for these specific users
-  console.log('Fetching user data from Supabase...')
-  const userPromises = userIds.map(userId => 
-    supabase.auth.admin.getUserById(userId)
-  )
-  
-  const userResults = await Promise.all(userPromises)
-  const users = userResults
-    .map(result => result.data?.user)
-    .filter(user => user !== null) as User[]
+  // Get user data from database for these users
+  console.log('Fetching user data from database...')
+  const users = await prisma.user.findMany({
+    where: { id: { in: userIds } },
+    select: { id: true, email: true, createdAt: true },
+  })
 
-  console.log(`Retrieved ${users.length} users from Supabase`)
+  console.log(`Retrieved ${users.length} users from database`)
 
   // Get all trades for these users
   console.log('Fetching trades for users...')
@@ -272,7 +222,7 @@ export async function getUserEquityData(page: number = 1, limit: number = 10) {
     return {
       userId: user.id,
       email: user.email || 'Unknown',
-      createdAt: user.created_at || '',
+      createdAt: user.createdAt?.toISOString() || '',
       trades: userTrades,
       equityCurve,
       statistics: {
@@ -308,13 +258,9 @@ export async function getUserEquityData(page: number = 1, limit: number = 10) {
 export async function getIndividualUserEquityData(userId: string) {
   console.log(`Starting getIndividualUserEquityData for user ${userId}`)
 
-  // Get user from Supabase auth
-  const { data: userData, error: userError } = await supabase.auth.admin.getUserById(userId)
-  
-  if (userError || !userData.user) {
-    console.error('Error fetching user:', userError)
-    return null
-  }
+  // Get user from database
+  const userData = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, createdAt: true } })
+  if (!userData) return null
 
   // Get trades for this specific user
   const trades = await prisma.trade.findMany({
@@ -370,8 +316,8 @@ export async function getIndividualUserEquityData(userId: string) {
 
   return {
     userId,
-    email: userData.user.email || 'Unknown',
-    createdAt: userData.user.created_at || '',
+    email: userData.email || 'Unknown',
+    createdAt: userData.createdAt?.toISOString() || '',
     trades,
     equityCurve,
     statistics: {
@@ -423,18 +369,14 @@ export async function getBusinessEquityData(businessId: string, page: number = 1
 
   console.log(`Processing ${paginatedTraderIds.length} traders for page ${page}`)
 
-  // Get user data from Supabase for these specific traders
-  console.log('Fetching user data from Supabase...')
-  const userPromises = paginatedTraderIds.map(userId => 
-    supabase.auth.admin.getUserById(userId)
-  )
-  
-  const userResults = await Promise.all(userPromises)
-  const users = userResults
-    .map(result => result.data?.user)
-    .filter(user => user !== null) as User[]
+  // Get user data for these specific traders
+  console.log('Fetching user data from database...')
+  const users = await prisma.user.findMany({
+    where: { id: { in: paginatedTraderIds } },
+    select: { id: true, email: true, createdAt: true },
+  })
 
-  console.log(`Retrieved ${users.length} users from Supabase`)
+  console.log(`Retrieved ${users.length} users from database`)
 
   // Get all trades for these users
   console.log('Fetching trades for users...')
@@ -509,7 +451,7 @@ export async function getBusinessEquityData(businessId: string, page: number = 1
     return {
       userId: user.id,
       email: user.email || 'Unknown',
-      createdAt: user.created_at || '',
+      createdAt: user.createdAt?.toISOString() || '',
       trades: userTrades,
       equityCurve,
       statistics: {
@@ -570,16 +512,12 @@ export async function exportBusinessTradesAction(businessId: string): Promise<st
     throw new Error('No traders found in this business')
   }
 
-  // Get user data from Supabase for all traders
-  console.log('Fetching user data from Supabase...')
-  const userPromises = business.traderIds.map(userId => 
-    supabase.auth.admin.getUserById(userId)
-  )
-  
-  const userResults = await Promise.all(userPromises)
-  const users = userResults
-    .map(result => result.data?.user)
-    .filter(user => user !== null) as User[]
+  // Get user data for all traders
+  console.log('Fetching user data from database...')
+  const users = await prisma.user.findMany({
+    where: { id: { in: business.traderIds } },
+    select: { id: true, email: true },
+  })
 
   // Create a map of userId to email
   const userEmailMap = users.reduce((acc, user) => {
@@ -587,7 +525,7 @@ export async function exportBusinessTradesAction(businessId: string): Promise<st
     return acc
   }, {} as Record<string, string>)
 
-  console.log(`Retrieved ${users.length} users from Supabase`)
+  console.log(`Retrieved ${users.length} users from database`)
 
   // Get all trades for these users
   console.log('Fetching trades for all users...')

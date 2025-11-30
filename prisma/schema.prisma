@@ -1,18 +1,17 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
-  schemas   = ["public"]
+  provider = "mongodb"
+  url      = env("MONGODB_URI")
 }
 
 model Trade {
-  id                String   @id @unique @default(uuid())
+  id                String   @id @map("_id") @default(auto()) @db.ObjectId
   accountNumber     String
-  quantity          Int
+  quantity          Float
   entryId           String?  @default("")
   closeId           String?  @default("")
   instrument        String
@@ -22,7 +21,7 @@ model Trade {
   closeDate         String
   pnl               Float
   timeInPosition    Float    @default(0)
-  userId            String
+  userId            String   @db.ObjectId
   side              String?  @default("")
   commission        Float    @default(0)
   createdAt         DateTime @default(now())
@@ -31,81 +30,77 @@ model Trade {
   imageBase64       String?
   videoUrl          String?
   imageBase64Second String?
-  groupId           String?  @default("")
+  groupId           String?  @db.ObjectId
   images            String[] @default([])
 
   @@index([accountNumber])
   @@index([groupId])
-  @@schema("public")
 }
 
 model TickDetails {
-  id        String @id @unique @default(uuid())
+  id        String @id @map("_id") @default(auto()) @db.ObjectId
   ticker    String
   tickValue Float
   tickSize  Float
-
-  @@schema("public")
 }
 
 model Subscription {
-  id          String    @id @unique @default(uuid())
+  id          String    @id @map("_id") @default(auto()) @db.ObjectId
   email       String    @unique
   plan        String
   createdAt   DateTime  @default(now())
-  userId      String    @unique
+  userId      String    @unique @db.ObjectId
   endDate     DateTime?
   status      String    @default("ACTIVE")
   trialEndsAt DateTime?
   interval    String?
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id])
 
-  @@index([email])
-  @@schema("public")
+  // email already unique; no extra index needed
 }
 
 model BusinessSubscription {
-  id          String    @id @unique @default(uuid())
+  id          String    @id @map("_id") @default(auto()) @db.ObjectId
   email       String    @unique
   plan        String
   createdAt   DateTime  @default(now())
-  userId      String    @unique
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  businessId  String    @unique
+  userId      String    @unique @db.ObjectId
+  user        User      @relation(fields: [userId], references: [id])
+  business    Business  @relation(fields: [businessId], references: [id])
+  businessId  String    @unique @db.ObjectId
   endDate     DateTime?
   status      String    @default("ACTIVE")
   trialEndsAt DateTime?
   interval    String?
 
-  @@index([email])
-  @@index([userId])
-  @@index([businessId])
-  @@schema("public")
+  // indexes implied by unique fields; remove duplicates
 }
 
 model Notification {
-  id          String    @id @default(cuid())
-  userId      String
+  id          String    @id @map("_id") @default(auto()) @db.ObjectId
+  userId      String    @db.ObjectId
   title       String
   description String
   createdAt   DateTime  @default(now())
   readAt      DateTime?
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id])
 
   @@index([userId])
-  @@schema("public")
 }
 
 model User {
-  id                    String                 @id @default(cuid())
+  id                    String                 @id @map("_id") @default(auto()) @db.ObjectId
   email                 String                 @unique
   auth_user_id          String                 @unique
+  passwordHash          String?
   isFirstConnection     Boolean                @default(true)
   etpToken              String?
   isBeta                Boolean                @default(false)
   language              String                 @default("en")
+  openaiApiKey          String?
   thorToken             String?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
   accounts              Account[]
   businesses            Business[]
   comments              Comment[]
@@ -122,13 +117,12 @@ model User {
   businessSubscriptions BusinessSubscription[]
   referral              Referral?
 
-  @@index([email])
-  @@schema("public")
+  // email already unique; no extra index needed
 }
 
 model Synchronization {
-  id             String    @id @default(uuid())
-  userId         String
+  id             String    @id @map("_id") @default(auto()) @db.ObjectId
+  userId         String    @db.ObjectId
   service        String
   accountId      String
   lastSyncedAt   DateTime
@@ -137,86 +131,81 @@ model Synchronization {
   token          String?
   tokenExpiresAt DateTime?
   dailySyncTime  DateTime?
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User      @relation(fields: [userId], references: [id])
 
   @@unique([userId, service, accountId])
   @@index([userId])
   @@index([service])
-  @@schema("public")
 }
 
 model Business {
-  id                   String                @id @default(uuid())
+  id                   String                @id @map("_id") @default(auto()) @db.ObjectId
   name                 String
-  userId               String
+  userId               String                @db.ObjectId
   traderIds            String[]              @default([])
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
-  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                 User                  @relation(fields: [userId], references: [id])
   invitations          BusinessInvitation[]
   managers             BusinessManager[]
   businessSubscription BusinessSubscription?
 
   @@unique([name, userId])
   @@index([userId])
-  @@schema("public")
 }
 
 model BusinessManager {
-  id         String   @id @default(uuid())
-  businessId String
+  id         String   @id @map("_id") @default(auto()) @db.ObjectId
+  businessId String   @db.ObjectId
   managerId  String
   access     String   @default("viewer")
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
-  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business   Business @relation(fields: [businessId], references: [id])
 
   @@unique([businessId, managerId])
   @@index([businessId])
   @@index([managerId])
-  @@schema("public")
 }
 
 model BusinessInvitation {
-  id         String   @id @default(uuid())
-  businessId String
+  id         String   @id @map("_id") @default(auto()) @db.ObjectId
+  businessId String   @db.ObjectId
   email      String
   invitedBy  String
   status     String   @default("PENDING")
-  expiresAt  DateTime @default(dbgenerated("(now() + '7 days'::interval)"))
+  expiresAt  DateTime
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
-  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business   Business @relation(fields: [businessId], references: [id])
 
   @@unique([businessId, email])
   @@index([businessId])
-  @@index([email])
+  // email already unique; no extra index needed
   @@index([status])
-  @@schema("public")
 }
 
 model Group {
-  id        String    @id @default(uuid())
+  id        String    @id @map("_id") @default(auto()) @db.ObjectId
   name      String
-  userId    String
+  userId    String    @db.ObjectId
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   accounts  Account[]
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id])
 
   @@unique([name, userId])
   @@index([userId])
-  @@schema("public")
 }
 
 model Account {
-  id                      String            @id @unique @default(uuid())
+  id                      String            @id @map("_id") @default(auto()) @db.ObjectId
   number                  String
   propfirm                String            @default("")
   drawdownThreshold       Float             @default(0)
   profitTarget            Float             @default(0)
   isPerformance           Boolean           @default(false)
-  userId                  String
+  userId                  String            @db.ObjectId
   createdAt               DateTime          @default(now())
   startingBalance         Float             @default(0)
   payoutCount             Int               @default(0)
@@ -224,7 +213,7 @@ model Account {
   trailingStopProfit      Float?
   resetDate               DateTime?
   consistencyPercentage   Float?            @default(30)
-  groupId                 String?
+  groupId                 String?           @db.ObjectId
   accountSize             String?
   accountSizeName         String?
   activationFees          Float?
@@ -253,7 +242,7 @@ model Account {
   renewalNotice           Int?
   minPnlToCountAsDay      Float?
   group                   Group?            @relation(fields: [groupId], references: [id])
-  user                    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                    User              @relation(fields: [userId], references: [id])
   payouts                 Payout[]
   buffer                  Float             @default(0)
 
@@ -261,38 +250,33 @@ model Account {
   @@index([number])
   @@index([groupId])
   @@index([nextPaymentDate])
-  @@schema("public")
 }
 
 model Payout {
-  id            String   @id @default(uuid())
+  id            String   @id @map("_id") @default(auto()) @db.ObjectId
   amount        Float
   date          DateTime
   createdAt     DateTime @default(now())
   status        String   @default("PENDING")
   accountNumber String
-  accountId     String
-  account       Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  accountId     String   @db.ObjectId
+  account       Account  @relation(fields: [accountId], references: [id])
 
   @@index([accountNumber])
-  @@schema("public")
 }
 
 model DashboardLayout {
-  id        String   @id @default(uuid())
-  userId    String   @unique
+  id        String   @id @map("_id") @default(auto()) @db.ObjectId
+  userId    String   @unique @db.ObjectId
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   desktop   Json     @default("[]")
   mobile    Json     @default("[]")
-  user      User     @relation(fields: [userId], references: [auth_user_id], onDelete: Cascade)
-
-  @@index([userId])
-  @@schema("public")
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model SubscriptionFeedback {
-  id                 String   @id @default(uuid())
+  id                 String   @id @map("_id") @default(auto()) @db.ObjectId
   email              String
   event              String
   createdAt          DateTime @default(now())
@@ -300,12 +284,11 @@ model SubscriptionFeedback {
   feedback           String?
 
   @@index([email])
-  @@schema("public")
 }
 
 model Mood {
-  id                   String   @id @default(uuid())
-  userId               String
+  id                   String   @id @map("_id") @default(auto()) @db.ObjectId
+  userId               String   @db.ObjectId
   day                  DateTime
   mood                 String
   conversation         Json?
@@ -315,17 +298,16 @@ model Mood {
   hasTradingExperience Boolean?
   journalContent       String?
   selectedNews         String[] @default([])
-  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                 User     @relation(fields: [userId], references: [id])
 
   @@unique([userId, day])
   @@index([userId])
   @@index([day])
-  @@schema("public")
 }
 
 model Shared {
-  id             String    @id @default(uuid())
-  userId         String
+  id             String    @id @map("_id") @default(auto()) @db.ObjectId
+  userId         String    @db.ObjectId
   slug           String    @unique
   title          String?
   description    String?
@@ -339,26 +321,20 @@ model Shared {
   mobile         Json      @default("[]")
 
   @@index([userId])
-  @@index([slug])
-  @@schema("public")
 }
 
 model Referral {
-  id              String   @id @default(uuid())
-  userId          String   @unique
-  slug             String   @unique
+  id              String   @id @map("_id") @default(auto()) @db.ObjectId
+  userId          String   @unique @db.ObjectId
+  slug            String   @unique
   referredUserIds String[] @default([])
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([slug])
-  @@schema("public")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id])
 }
 
 model FinancialEvent {
-  id          String   @id @default(uuid())
+  id          String   @id @map("_id") @default(auto()) @db.ObjectId
   title       String
   date        DateTime
   importance  String
@@ -373,91 +349,84 @@ model FinancialEvent {
 
   @@unique([title, date, lang, timezone])
   @@index([date])
-  @@schema("public")
 }
 
 model Tag {
-  id          String   @id @default(uuid())
+  id          String   @id @map("_id") @default(auto()) @db.ObjectId
   name        String
   description String?
   color       String?  @default("#CBD5E1")
-  userId      String
+  userId      String   @db.ObjectId
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id])
 
   @@unique([name, userId])
   @@index([userId])
-  @@schema("public")
 }
 
 model Newsletter {
-  email     String  @id @unique
+  id        String  @id @map("_id") @default(auto()) @db.ObjectId
+  email     String  @unique
   isActive  Boolean @default(true)
   firstName String?
   lastName  String?
-
-  @@index([email])
-  @@schema("public")
 }
 
 model Post {
-  id          String     @id @default(uuid())
+  id          String     @id @map("_id") @default(auto()) @db.ObjectId
   title       String
   content     String
   type        PostType   @default(FEATURE_REQUEST)
   status      PostStatus @default(OPEN)
-  userId      String
+  userId      String     @db.ObjectId
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   screenshots String[]   @default([])
   comments    Comment[]
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User       @relation(fields: [userId], references: [id])
   votes       Vote[]
 
   @@index([userId])
   @@index([type])
   @@index([status])
-  @@schema("public")
 }
 
 model Comment {
-  id        String    @id @default(uuid())
+  id        String    @id @map("_id") @default(auto()) @db.ObjectId
   content   String
-  postId    String
-  userId    String
-  parentId  String?
+  postId    String    @db.ObjectId
+  userId    String    @db.ObjectId
+  parentId  String?   @db.ObjectId
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   replies   Comment[] @relation("CommentReplies")
-  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post      @relation(fields: [postId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
 
   @@index([postId])
   @@index([userId])
   @@index([parentId])
-  @@schema("public")
 }
 
 model Vote {
-  id        String   @id @default(uuid())
+  id        String   @id @map("_id") @default(auto()) @db.ObjectId
   type      VoteType
-  postId    String
-  userId    String
+  postId    String   @db.ObjectId
+  userId    String   @db.ObjectId
   createdAt DateTime @default(now())
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
 
   @@unique([postId, userId])
   @@index([postId])
   @@index([userId])
-  @@schema("public")
 }
 
 model Order {
-  id                 String   @id @default(uuid())
-  accountId          String
+  id                 String   @id @map("_id") @default(auto()) @db.ObjectId
+  accountId          String   @db.ObjectId
   orderId            String   @unique
   orderAction        String
   quantity           Int
@@ -466,17 +435,16 @@ model Order {
   time               DateTime
   symbol             String
   instrumentType     String
-  userId             String
+  userId             String   @db.ObjectId
   createdAt          DateTime @default(now())
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user               User     @relation(fields: [userId], references: [id])
 
   @@index([accountId])
   @@index([userId])
-  @@schema("public")
 }
 
 model TradeAnalytics {
-  id                 String   @id @default(uuid())
+  id                 String   @id @map("_id") @default(auto()) @db.ObjectId
   tradeId            String   @unique
   mae                Float    @default(0)
   mfe                Float    @default(0)
@@ -488,13 +456,12 @@ model TradeAnalytics {
   computedAt         DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  @@index([tradeId])
+  // tradeId already unique; no extra index needed
   @@index([computedAt])
-  @@schema("public")
 }
 
 model HistoricalData {
-  id             String   @id @default(uuid())
+  id             String   @id @map("_id") @default(auto()) @db.ObjectId
   symbol         String
   databentSymbol String
   timestamp      DateTime
@@ -510,15 +477,12 @@ model HistoricalData {
   @@index([symbol])
   @@index([databentSymbol])
   @@index([timestamp])
-  @@schema("public")
 }
 
 enum PostType {
   FEATURE_REQUEST
   BUG_REPORT
   DISCUSSION
-
-  @@schema("public")
 }
 
 enum PostStatus {
@@ -526,15 +490,11 @@ enum PostStatus {
   IN_PROGRESS
   COMPLETED
   CLOSED
-
-  @@schema("public")
 }
 
 enum VoteType {
   UPVOTE
   DOWNVOTE
-
-  @@schema("public")
 }
 
 enum PaymentFrequency {
@@ -543,13 +503,9 @@ enum PaymentFrequency {
   BIANNUAL
   ANNUAL
   CUSTOM
-
-  @@schema("public")
 }
 
 enum PromoType {
   DIRECT
   PERCENTAGE
-
-  @@schema("public")
 }

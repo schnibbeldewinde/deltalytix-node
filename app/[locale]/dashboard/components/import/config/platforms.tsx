@@ -188,6 +188,7 @@ export interface PlatformConfig {
   customComponent?: ComponentType<{ setIsOpen: React.Dispatch<React.SetStateAction<boolean>> }>
   processorComponent?: ComponentType<PlatformProcessorProps>
   tutorialLink?: string
+  disableAiFormatting?: boolean
   steps: {
     id: Step
     title: TranslationKey
@@ -255,6 +256,448 @@ const processStandardCsv = (data: string[][]): ProcessedData => {
   return { headers, processedData: data.slice(1) };
 };
 
+// --- Sierra Chart Trade Activity Log (tab-separated) ---
+const sierraMultiplier = (symbol: string) => {
+  const base = symbol.toUpperCase()
+  if (base.startsWith('MES')) return 5
+  if (base.startsWith('ES')) return 50
+  if (base.startsWith('MNQ')) return 2
+  if (base.startsWith('NQ')) return 20
+  if (base.startsWith('MCL') || base.startsWith('MCLE')) return 100
+  if (base.startsWith('QM')) return 50
+  if (base.startsWith('CL')) return 1000
+  return 1
+}
+
+const processSierra = (data: string[][]): ProcessedData => {
+  if (data.length < 2) throw new Error('The Sierra file appears empty.')
+
+  const header = data[0].map(h => (h || '').trim())
+  const idx = (name: string) => header.findIndex(h => h.toLowerCase() === name.toLowerCase())
+
+  const iDateTime = idx('DateTime')
+  const iTransDateTime = idx('TransDateTime')
+  const iSymbol = idx('Symbol')
+  const iInternalOrderId = idx('InternalOrderID')
+  const iParentId = idx('ParentInternalOrderID')
+  const iQuantity = idx('Quantity')
+  const iBuySell = idx('BuySell')
+  const iFillPrice = idx('FillPrice')
+  const iTradeAccount = idx('TradeAccount')
+  const iOpenClose = idx('OpenClose')
+  const iActivityType = idx('ActivityType')
+
+  const parseDate = (val: string) => {
+    if (!val) return null
+    const clean = val.replace(/\s+/g, ' ').trim()
+    if (!clean) return null
+    const parts = clean.split(' ')
+    if (parts.length < 2) return null
+    const [datePart, timePartRaw] = [parts[0], parts[1]]
+    const [timeMain, micro = '000'] = timePartRaw.split('.')
+    const ms = (micro || '').slice(0, 3).padEnd(3, '0')
+    const iso = `${datePart}T${timeMain}.${ms}Z`
+    const d = new Date(iso)
+    return isNaN(d.getTime()) ? null : d.toISOString()
+  }
+
+  const stateByKey: Record<string, {
+    opens: { qty: number, price: number, ts: string }[]
+    pos: number
+    side: 'long' | 'short' | null
+    entryTs: string | null
+    entryValue: number
+    entryQty: number
+    closeValue: number
+    closeQty: number
+    pnl: number
+  }> = {}
+  const processed: string[][] = []
+
+  const getVal = (row: string[], i: number) => (i >= 0 && i < row.length ? (row[i] ?? '').toString().trim() : '')
+
+  const normalizeSymbol = (raw: string) => {
+    const withoutPrefix = raw.replace(/^F\.US\./i, '')
+    const withoutExchange = withoutPrefix.split('.')[0] || withoutPrefix
+    return withoutExchange
+  }
+
+  const instrumentForDisplay = (sym: string) => {
+    // Keep contract month/year but drop exchange suffix
+    return sym || ''
+  }
+
+  const specMap: Record<string, { tickSize: number; tickValue: number }> = {
+    // Equity Index (USD)
+    MES: { tickSize: 0.25, tickValue: 1.25 },
+    ES: { tickSize: 0.25, tickValue: 12.5 },
+    MNQ: { tickSize: 0.25, tickValue: 0.5 },
+    NQ: { tickSize: 0.25, tickValue: 5 },
+    MYM: { tickSize: 1, tickValue: 0.5 },
+    YM: { tickSize: 1, tickValue: 5 },
+    M2K: { tickSize: 0.1, tickValue: 0.5 },
+    RTY: { tickSize: 0.1, tickValue: 10 },
+    // Energies (USD)
+    CL: { tickSize: 0.01, tickValue: 10 },
+    QM: { tickSize: 0.025, tickValue: 12.5 },
+    MCL: { tickSize: 0.01, tickValue: 1 },
+    NG: { tickSize: 0.001, tickValue: 10 },
+    MNG: { tickSize: 0.001, tickValue: 1 },
+    RB: { tickSize: 0.0001, tickValue: 4.2 },
+    HO: { tickSize: 0.0001, tickValue: 4.2 },
+    // Metals (USD)
+    GC: { tickSize: 0.1, tickValue: 10 },
+    MGC: { tickSize: 0.1, tickValue: 1 },
+    SI: { tickSize: 0.005, tickValue: 25 },
+    SIL: { tickSize: 0.005, tickValue: 2.5 },
+    HG: { tickSize: 0.0005, tickValue: 12.5 },
+    MHG: { tickSize: 0.0005, tickValue: 1.25 },
+    PL: { tickSize: 0.1, tickValue: 5 },
+    // Financials (USD)
+    ZB: { tickSize: 1 / 32, tickValue: 31.25 },
+    ZN: { tickSize: 1 / 128, tickValue: 15.625 },
+    ZF: { tickSize: 1 / 128, tickValue: 7.8125 },
+    ZT: { tickSize: 1 / 128, tickValue: 15.625 },
+    UB: { tickSize: 1 / 32, tickValue: 31.25 },
+    SR3: { tickSize: 0.0025, tickValue: 6.25 },
+    // Grains / Softs (USD)
+    ZC: { tickSize: 0.25, tickValue: 12.5 },
+    ZW: { tickSize: 0.25, tickValue: 12.5 },
+    ZS: { tickSize: 0.25, tickValue: 12.5 },
+    ZM: { tickSize: 0.1, tickValue: 10 },
+    ZL: { tickSize: 0.0001, tickValue: 6 },
+    ZO: { tickSize: 0.25, tickValue: 12.5 },
+    ZR: { tickSize: 0.005, tickValue: 10 },
+    CC: { tickSize: 1, tickValue: 10 },
+    KC: { tickSize: 0.05, tickValue: 18.75 },
+    CT: { tickSize: 0.01, tickValue: 5 },
+    SB: { tickSize: 0.01, tickValue: 11.2 },
+    OJ: { tickSize: 0.05, tickValue: 7.5 },
+    LE: { tickSize: 0.025, tickValue: 10 },
+    GF: { tickSize: 0.025, tickValue: 12.5 },
+    HE: { tickSize: 0.025, tickValue: 10 },
+    // FX (USD margined)
+    '6E': { tickSize: 0.00005, tickValue: 6.25 }, // Euro FX (EUR/USD) min tick 0.00005 -> $6.25
+    '6B': { tickSize: 0.0001, tickValue: 6.25 }, // GBP
+    '6A': { tickSize: 0.0001, tickValue: 10 },   // AUD
+    '6C': { tickSize: 0.0001, tickValue: 10 },   // CAD
+    '6S': { tickSize: 0.0001, tickValue: 12.5 }, // CHF
+    '6J': { tickSize: 0.000001, tickValue: 12.5 }, // JPY (USD settled)
+    // Micros FX
+    M6E: { tickSize: 0.0001, tickValue: 1.25 },
+    M6A: { tickSize: 0.0001, tickValue: 1 },
+    M6B: { tickSize: 0.0001, tickValue: 0.625 },
+    // EUR-denominated indexes/rates
+    FDAX: { tickSize: 0.5, tickValue: 12.5 },    // €12.5
+    FESX: { tickSize: 1, tickValue: 10 },        // €10
+    FGBL: { tickSize: 0.01, tickValue: 10 },     // €10
+    FGBM: { tickSize: 0.01, tickValue: 10 },     // €10
+    FGBS: { tickSize: 0.005, tickValue: 5 },     // €5
+    FGBX: { tickSize: 0.02, tickValue: 20 },     // €20
+    FBTP: { tickSize: 0.01, tickValue: 10 },     // €10
+    FBTS: { tickSize: 0.01, tickValue: 10 },     // €10
+    FOAT: { tickSize: 0.01, tickValue: 10 },     // €10
+  }
+
+  const getSpec = (symbol: string) => {
+    const upper = symbol.toUpperCase()
+    const base = upper.replace(/([FGHJKMNQUVXZ])\d{1,2}$/i, '')
+    if (specMap[base]) return specMap[base]
+    return { tickSize: 0.25, tickValue: 1.25 }
+  }
+
+  data.slice(1).forEach(row => {
+    const activity = getVal(row, iActivityType).toLowerCase()
+    if (activity && activity !== 'fills') return
+
+    const openClose = getVal(row, iOpenClose).toLowerCase()
+    const internalId = getVal(row, iInternalOrderId)
+    const parentId = getVal(row, iParentId)
+    const symbolRaw = getVal(row, iSymbol)
+    const symbolBaseRaw = normalizeSymbol(symbolRaw)
+    const symbolDisplay = instrumentForDisplay(symbolBaseRaw)
+    const qty = parseInt(getVal(row, iQuantity) || '0', 10) || 0
+    const sideRaw = getVal(row, iBuySell).toLowerCase()
+    const side = sideRaw === 'buy' ? 'long' : 'short'
+    const fillPrice = parseFloat(getVal(row, iFillPrice) || '0') || 0
+    const ts = parseDate(getVal(row, iDateTime)) || parseDate(getVal(row, iTransDateTime))
+    if (!ts) return
+    const account = getVal(row, iTradeAccount)
+    const key = `${account || ''}|${symbolBaseRaw}`
+    const spec = getSpec(symbolDisplay)
+
+    if (!stateByKey[key]) {
+      stateByKey[key] = {
+        opens: [],
+        pos: 0,
+        side: null,
+        entryTs: null,
+        entryValue: 0,
+        entryQty: 0,
+        closeValue: 0,
+        closeQty: 0,
+        pnl: 0
+      }
+    }
+    const st = stateByKey[key]
+
+    const sideSign = side === 'long' ? 1 : -1
+    const posAfter = st.pos + sideSign * qty
+
+    // If position goes from flat to non-flat, reset aggregates
+    if (st.pos === 0) {
+      st.entryTs = ts
+      st.entryValue = 0
+      st.entryQty = 0
+      st.closeValue = 0
+      st.closeQty = 0
+      st.pnl = 0
+      st.side = side
+    }
+
+    if (sideSign === Math.sign(st.pos) || st.pos === 0) {
+      // Opening more in same direction
+      st.opens.push({ qty, price: fillPrice, ts })
+      st.entryValue += fillPrice * qty
+      st.entryQty += qty
+      st.pos = posAfter
+    } else {
+      // Closing some/all
+      let remaining = qty
+      while (remaining > 0 && st.opens.length > 0) {
+        const openFill = st.opens[0]
+        const matchQty = Math.min(openFill.qty, remaining)
+        const priceDiff = fillPrice - openFill.price
+        const ticks = priceDiff / spec.tickSize
+        st.pnl += ticks * spec.tickValue * matchQty
+        st.closeValue += fillPrice * matchQty
+        st.closeQty += matchQty
+        openFill.qty -= matchQty
+        remaining -= matchQty
+        if (openFill.qty <= 0) {
+          st.opens.shift()
+        } else {
+          st.opens[0] = openFill
+        }
+      }
+      st.pos = posAfter
+
+      // If we flipped past flat, treat leftover as new position in opposite direction
+      if (st.pos === 0 && remaining > 0) {
+        st.opens = [{ qty: remaining, price: fillPrice, ts }]
+        st.entryTs = ts
+        st.entryValue = fillPrice * remaining
+        st.entryQty = remaining
+        st.closeValue = 0
+        st.closeQty = 0
+        st.pnl = 0
+        st.side = side
+        st.pos = remaining * sideSign
+      }
+
+      // If flat now, emit a trade
+      if (st.pos === 0 && st.closeQty > 0) {
+        const totalQty = st.closeQty
+        const avgEntry = st.entryQty ? st.entryValue / st.entryQty : 0
+        const avgExit = st.closeQty ? st.closeValue / st.closeQty : 0
+        const timeInPos = (new Date(ts).getTime() - new Date(st.entryTs || ts).getTime()) / 1000
+        processed.push([
+          account,
+          symbolDisplay,
+          '', // entryId not tracked in aggregated mode
+          '', // closeId
+          String(totalQty),
+          avgEntry.toString(),
+          avgExit.toString(),
+          st.entryTs || ts,
+          ts,
+          st.pnl.toFixed(2),
+          timeInPos.toString(),
+          st.side || side,
+          '0',
+        ])
+        // reset state after closing
+        st.entryTs = null
+        st.entryValue = 0
+        st.entryQty = 0
+        st.closeValue = 0
+        st.closeQty = 0
+        st.pnl = 0
+        st.side = null
+        st.opens = []
+      }
+    }
+  })
+
+  const headers = [
+    'accountNumber',
+    'instrument',
+    'entryId',
+    'closeId',
+    'quantity',
+    'entryPrice',
+    'closePrice',
+    'entryDate',
+    'closeDate',
+    'pnl',
+    'timeInPosition',
+    'side',
+    'commission',
+  ]
+
+  // Fallback: if no pairs found, treat each fill as a separate trade with zero PnL/time
+  if (!processed.length) {
+    data.slice(1).forEach(row => {
+      const activity = getVal(row, iActivityType).toLowerCase()
+      if (activity && activity !== 'fills') return
+      const symbolRaw = getVal(row, iSymbol)
+      const symbolBase = instrumentForDisplay(normalizeSymbol(symbolRaw))
+      const qty = parseInt(getVal(row, iQuantity) || '0', 10) || 0
+      const sideRaw = getVal(row, iBuySell).toLowerCase()
+      const side = sideRaw === 'buy' ? 'long' : 'short'
+      const fillPrice = parseFloat(getVal(row, iFillPrice) || '0') || 0
+      const ts = parseDate(getVal(row, iDateTime)) || parseDate(getVal(row, iTransDateTime))
+      if (!ts) return
+      const account = getVal(row, iTradeAccount)
+      const multiplier = sierraMultiplier(symbolBase)
+      const pnl = parseFloat(((0) * multiplier).toFixed(2))
+      processed.push([
+        account,
+        symbolBase,
+        getVal(row, iInternalOrderId),
+        getVal(row, iParentId) || getVal(row, iInternalOrderId),
+        String(qty || 1),
+        fillPrice.toString(),
+        fillPrice.toString(),
+        ts,
+        ts,
+        pnl.toString(),
+        '0',
+        side,
+        '0',
+      ])
+    })
+  }
+
+  return { headers, processedData: processed }
+}
+
+// MetaTrader 5 history report (HTML, no AI mapping)
+const processMt5 = (data: string[][]): ProcessedData => {
+  if (!data.length || !data[0] || !data[0][0]) {
+    throw new Error('The MT5 HTML file appears to be empty.')
+  }
+
+  const html = data.flat().join('\n').replace(/\u0000/g, '')
+  const decode = (s: string) => s.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+  const strip = (s: string) => decode(s.replace(/<[^>]+>/g, '')).trim()
+
+  const accountMatch = html.match(/Account:\s*<\/th>\s*<th[^>]*><b>(.*?)<\/b>/i)
+  const accountNumber = accountMatch ? strip(accountMatch[1]) : ''
+
+  // Isolate the Positions table block
+  const posStart = html.indexOf('<b>Positions</b>')
+  const tableStart = posStart >= 0 ? html.lastIndexOf('<table', posStart) : -1
+  const tableEnd = tableStart >= 0 ? html.indexOf('</table>', tableStart) : -1
+  const block = tableStart >= 0 && tableEnd > tableStart ? html.slice(tableStart, tableEnd) : html
+
+  const normalizeTs = (val: string) => {
+    const clean = val.trim()
+    if (!clean) return ''
+    // MT5 format: 2025.09.02 08:36:55
+    return clean.replace(/\./g, '-').replace(' ', 'T') + 'Z'
+  }
+
+  // Extract all rows in the block
+  const rawRows: string[][] = []
+  const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi
+  let m: RegExpExecArray | null
+  while ((m = rowRegex.exec(block)) !== null) {
+    const cells = [...m[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(match => {
+      const full = match[0]
+      if (/class\s*=\s*["']?hidden/i.test(full)) return null
+      return strip(match[1])
+    }).filter((v): v is string => v !== null)
+    if (cells.length) rawRows.push(cells)
+  }
+
+  // Find header row: must contain Time and Symbol (case-insensitive)
+  const headerIdx = rawRows.findIndex(r =>
+    r.some(c => c.toLowerCase() === 'time') &&
+    r.some(c => c.toLowerCase() === 'symbol')
+  )
+  const bodyRows = headerIdx >= 0 ? rawRows.slice(headerIdx + 1) : rawRows
+
+  const processedData: string[][] = []
+  for (const cells of bodyRows) {
+    // Expect: Time, Position, Symbol, Type, Volume, Price(open), S/L, T/P, Time(close), Price(close), Commission, Swap, Profit
+    if (cells.length < 13) continue
+    if (!/^\d{4}\.\d{2}\.\d{2}/.test(cells[0])) continue
+
+    const [
+      openTime,
+      position,
+      symbol,
+      type,
+      volume,
+      openPrice,
+      _sl,
+      _tp,
+      closeTime,
+      closePrice,
+      commission = '0',
+      _swap = '0',
+      profit = '0'
+    ] = cells
+
+    const qty = parseFloat(volume)
+    if (!symbol || isNaN(qty) || qty <= 0) continue
+
+    const side = type.toLowerCase().includes('buy') ? 'long' : 'short'
+    const openTs = normalizeTs(openTime)
+    const closeTs = normalizeTs(closeTime)
+    if (!openTs || !closeTs) continue
+
+    const timeInPos = (new Date(closeTs).getTime() - new Date(openTs).getTime()) / 1000
+
+    processedData.push([
+      accountNumber,
+      symbol,
+      position,
+      position,
+      qty.toString(),
+      openPrice || '',
+      closePrice || '',
+      openTs,
+      closeTs,
+      (parseFloat(profit) || 0).toString(),
+      timeInPos.toString(),
+      side,
+      (parseFloat(commission) || 0).toString(),
+    ])
+  }
+
+  const headers = [
+    'accountNumber',
+    'instrument',
+    'entryId',
+    'closeId',
+    'quantity',
+    'entryPrice',
+    'closePrice',
+    'entryDate',
+    'closeDate',
+    'pnl',
+    'timeInPosition',
+    'side',
+    'commission',
+  ]
+
+  if (!processedData.length) throw new Error('No trades parsed from MT5 HTML report.')
+
+  return { headers, processedData }
+}
+
 export const platforms: PlatformConfig[] = [
   {
     platformName: 'rithmic-sync',
@@ -262,7 +705,7 @@ export const platforms: PlatformConfig[] = [
     name: 'import.type.rithmicSync.name',
     description: 'import.type.rithmicSync.description',
     category: 'Direct Account Sync',
-    videoUrl: process.env.NEXT_PUBLIC_RITHMIC_SYNC_TUTORIAL_VIDEO || '',
+    videoUrl: '',
     details: 'import.type.rithmicSync.details',
     logo: {
       path: '/logos/rithmic.png',
@@ -382,7 +825,7 @@ export const platforms: PlatformConfig[] = [
     name: 'import.type.tradovate.name',
     description: 'import.type.tradovate.description',
     category: 'Platform CSV Import',
-    videoUrl: process.env.NEXT_PUBLIC_TRADEOVATE_TUTORIAL_VIDEO || '',
+    videoUrl: '',
     details: '',
     logo: {
       path: '/logos/tradovate.png',
@@ -425,7 +868,7 @@ export const platforms: PlatformConfig[] = [
     name: 'import.type.quantower.name',
     description: 'import.type.quantower.description',
     category: 'Platform CSV Import',
-    videoUrl: process.env.NEXT_PUBLIC_QUANTOWER_TUTORIAL_VIDEO || '',
+    videoUrl: '',
     details: 'import.type.quantower.details',
     logo: {
       path: '/logos/quantower.png',
@@ -452,6 +895,80 @@ export const platforms: PlatformConfig[] = [
         title: 'import.steps.processTrades',
         description: 'import.steps.processTradesDescription',
         component: QuantowerOrderProcessor,
+        isLastStep: true
+      }
+    ]
+  },
+  {
+    platformName: 'mt5',
+    type: 'mt5',
+    name: 'MetaTrader 5',
+    description: 'Import MT5 History Report (HTML)',
+    category: 'Platform CSV Import',
+    details: 'Import your MetaTrader 5 history report (HTML export)',
+    logo: {
+      path: '/logos/MetaTrader_5.png',
+      alt: 'MetaTrader 5'
+    },
+    skipHeaderSelection: true,
+    requiresAccountSelection: false,
+    disableAiFormatting: true,
+    processFile: processMt5,
+    steps: [
+      {
+        id: 'select-import-type',
+        title: 'import.steps.selectPlatform',
+        description: 'import.steps.selectPlatformDescription',
+        component: ImportTypeSelection
+      },
+      {
+        id: 'upload-file',
+        title: 'import.steps.uploadFile',
+        description: 'import.steps.uploadFileDescription',
+        component: FileUpload
+      },
+      {
+        id: 'preview-trades',
+        title: 'import.steps.reviewTrades',
+        description: 'import.steps.reviewTradesDescription',
+        component: FormatPreview,
+        isLastStep: true
+      }
+    ]
+  },
+  {
+    platformName: 'sierra',
+    type: 'sierra',
+    name: 'Sierra Chart',
+    description: 'Import Sierra Trade Activity Log (TXT/TSV)',
+    category: 'Platform CSV Import',
+    details: 'Import Sierra Chart TradeActivityLog export',
+    logo: {
+      path: '/logos/sierra.png',
+      alt: 'Sierra Chart'
+    },
+    skipHeaderSelection: true,
+    requiresAccountSelection: false,
+    disableAiFormatting: true,
+    processFile: processSierra,
+    steps: [
+      {
+        id: 'select-import-type',
+        title: 'import.steps.selectPlatform',
+        description: 'import.steps.selectPlatformDescription',
+        component: ImportTypeSelection
+      },
+      {
+        id: 'upload-file',
+        title: 'import.steps.uploadFile',
+        description: 'import.steps.uploadFileDescription',
+        component: FileUpload
+      },
+      {
+        id: 'preview-trades',
+        title: 'import.steps.reviewTrades',
+        description: 'import.steps.reviewTradesDescription',
+        component: FormatPreview,
         isLastStep: true
       }
     ]
@@ -511,7 +1028,7 @@ export const platforms: PlatformConfig[] = [
     name: 'import.type.ninjaTrader.name',
     description: 'import.type.ninjaTrader.description',
     category: 'Platform CSV Import',
-    videoUrl: process.env.NEXT_PUBLIC_NINJATRADER_PERFORMANCE_TUTORIAL_VIDEO || '',
+    videoUrl: '',
     details: '',
     logo: {
       path: '/logos/ninjatrader.png',
@@ -553,7 +1070,7 @@ export const platforms: PlatformConfig[] = [
     name: 'import.type.rithmicPerf.name',
     description: 'import.type.rithmicPerf.description',
     category: 'Platform CSV Import',
-    videoUrl: process.env.NEXT_PUBLIC_RITHMIC_PERFORMANCE_TUTORIAL_VIDEO || '',
+    videoUrl: '',
     details: 'import.type.rithmicPerf.details',
     logo: {
       path: '/logos/rithmic.png',
@@ -591,7 +1108,7 @@ export const platforms: PlatformConfig[] = [
     name: 'import.type.rithmicOrders.name',
     description: 'import.type.rithmicOrders.description',
     category: 'Platform CSV Import',
-    videoUrl: process.env.NEXT_PUBLIC_RITHMIC_ORDER_TUTORIAL_VIDEO || '',
+    videoUrl: '',
     details: 'import.type.rithmicOrders.details',
     logo: {
       path: '/logos/rithmic.png',
@@ -629,7 +1146,7 @@ export const platforms: PlatformConfig[] = [
     name: 'import.type.etpSync.name',
     description: 'import.type.etpSync.description',
     category: 'Direct Account Sync',
-    videoUrl: process.env.NEXT_PUBLIC_ETP_SYNC_TUTORIAL_VIDEO || '',
+    videoUrl: '',
     isComingSoon: true,
     details: 'import.type.etpSync.details',
     logo: {
@@ -660,7 +1177,7 @@ export const platforms: PlatformConfig[] = [
     name: 'import.type.thorSync.name',
     description: 'import.type.thorSync.description',
     category: 'Direct Account Sync',
-    videoUrl: process.env.NEXT_PUBLIC_THOR_SYNC_TUTORIAL_VIDEO || '',
+    videoUrl: '',
     details: 'import.type.thorSync.details',
     logo: {
       path: '/logos/thor.png',
@@ -690,7 +1207,7 @@ export const platforms: PlatformConfig[] = [
     description: 'import.type.tradovateSync.description',
     category: 'Direct Account Sync',
     // isComingSoon: true,
-    videoUrl: process.env.NEXT_PUBLIC_TRADOVATE_SYNC_TUTORIAL_VIDEO || '',
+    videoUrl: '',
     details: 'import.type.tradovateSync.details',
     logo: {
       path: '/logos/tradovate.png',
@@ -719,7 +1236,7 @@ export const platforms: PlatformConfig[] = [
     name: 'import.type.pdfImport.name',
     description: 'import.type.pdfImport.description',
     category: 'Intelligent Import',
-    videoUrl: process.env.NEXT_PUBLIC_PDF_IMPORT_TUTORIAL_VIDEO || '',
+    videoUrl: '',
     details: 'import.type.pdfImport.details',
     logo: {
       path: '/logos/ibkr.png',
@@ -759,7 +1276,7 @@ export const platforms: PlatformConfig[] = [
     name: 'import.type.atas.name',
     description: 'import.type.atas.description',
     category: 'Platform CSV Import',
-    videoUrl: process.env.NEXT_PUBLIC_ATAS_TUTORIAL_VIDEO || '',
+    videoUrl: '',
     details: 'import.type.atas.details',
     logo: {
       component: AtasLogo,

@@ -233,7 +233,6 @@ export async function syncTradeTagsToTagTableAction() {
           userId: user.id,
           color: '#CBD5E1', // Default color
         })),
-        skipDuplicates: true,
       })
     }
 

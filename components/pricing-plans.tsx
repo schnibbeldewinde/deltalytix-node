@@ -276,54 +276,9 @@ export default function PricingPlans({ isModal, onClose, trigger, currentSubscri
     setIsLoading(true)
     
     try {
-      const { switchSubscriptionPlan } = await import('@/app/[locale]/dashboard/actions/billing')
-      const result = await switchSubscriptionPlan(lookupKey)
-      
-      if (result.success) {
-        toast.success(t('billing.planSwitched'), {
-          description: t('billing.planSwitchedDescription'),
-        })
-        
-        // Refresh the page to update subscription data
-        window.location.reload()
-      } else if ('requiresCheckout' in result && result.requiresCheckout) {
-        // Lifetime plans need checkout session, redirect to checkout
-        const form = document.createElement('form')
-        form.method = 'POST'
-        form.action = '/api/stripe/create-checkout-session'
-        
-        const finalLookupKey = result.lookupKey || lookupKey
-        const input = document.createElement('input')
-        input.type = 'hidden'
-        input.name = 'lookup_key'
-        input.value = finalLookupKey
-        form.appendChild(input)
-        
-        // Add promo code for Black Friday (lifetime plans)
-        if (finalLookupKey.includes('lifetime')) {
-          const promoInput = document.createElement('input')
-          promoInput.type = 'hidden'
-          promoInput.name = 'promo_code'
-          promoInput.value = 'BLACKFRIDAY'
-          form.appendChild(promoInput)
-        }
-        
-        // Add referral code if present
-        if (referralCode) {
-          const referralInput = document.createElement('input')
-          referralInput.type = 'hidden'
-          referralInput.name = 'referral'
-          referralInput.value = referralCode
-          form.appendChild(referralInput)
-        }
-        
-        document.body.appendChild(form)
-        form.submit()
-      } else {
-        toast.error(t('billing.error'), {
-          description: result.error,
-        })
-      }
+      toast.error(t('billing.error'), {
+        description: t('billing.planSwitchError'),
+      })
     } catch (error) {
       toast.error(t('billing.error'), {
         description: t('billing.planSwitchError'),

@@ -19,7 +19,8 @@ import {
 } from "@/components/ui/navigation-menu"
 import { useTheme } from '@/context/theme-provider'
 import { cn } from '@/lib/utils'
-import { useChangeLocale, useI18n } from "@/locales/client"
+import { useI18n } from "@/locales/client"
+import { useRouter, usePathname } from "next/navigation"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { LanguageSelector } from "@/components/ui/language-selector"
@@ -101,14 +102,21 @@ export default function BusinessNavbar() {
 
     const [themeOpen, setThemeOpen] = useState(false)
     const [languageOpen, setLanguageOpen] = useState(false)
-    const changeLocale = useChangeLocale()
+    const router = useRouter()
+    const pathname = usePathname()
     const handleThemeChange = (value: string) => {
         setTheme(value as "light" | "dark" | "system")
         setThemeOpen(false)
     }
 
     const handleLanguageChange = (value: string) => {
-        changeLocale(value as "en" | "fr")
+        const segments = (pathname || '').split('/').filter(Boolean)
+        if (segments.length > 0) {
+            segments[0] = value
+            router.replace('/' + segments.join('/'))
+        } else {
+            router.replace('/' + value)
+        }
         setLanguageOpen(false)
     }
 

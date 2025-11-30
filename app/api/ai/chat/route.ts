@@ -1,7 +1,7 @@
 import { streamText, stepCountIs, convertToModelMessages } from "ai";
 import { NextRequest } from "next/server";
 import { z } from 'zod/v3';
-import { openai } from "@ai-sdk/openai";
+import { createOpenAI } from "@ai-sdk/openai";
 import { getFinancialNews } from "./tools/get-financial-news";
 import { getJournalEntries } from "./tools/get-journal-entries";
 import { getMostTradedInstruments } from "./tools/get-most-traded-instruments";
@@ -14,6 +14,7 @@ import { getWeekSummaryForDate } from "./tools/get-week-summary-for-date";
 import { getPreviousConversation } from "./tools/get-previous-conversation";
 import { generateEquityChart } from "./tools/generate-equity-chart";
 import { startOfWeek, endOfWeek, subWeeks, format } from "date-fns";
+import { resolveOpenAIKey } from '@/app/api/ai/utils/resolve-openai-key'
 
 export const maxDuration = 60;
 
@@ -27,7 +28,13 @@ export async function POST(req: NextRequest) {
     const previousWeekStart = startOfWeek(subWeeks(now, 1), { weekStartsOn: 1 });
     const previousWeekEnd = endOfWeek(subWeeks(now, 1), { weekStartsOn: 1 });
 
+    const apiKey = await resolveOpenAIKey()
+    if (!apiKey) {
+      return new Response(JSON.stringify({ error: 'OpenAI API key is missing. Bitte in den Settings speichern.' }), { status: 400 })
+    }
+
     const convertedMessages = convertToModelMessages(messages);
+    const openai = createOpenAI({ apiKey })
     const result = streamText({
       model: openai("gpt-4o"),
       messages: convertedMessages,

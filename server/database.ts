@@ -10,6 +10,7 @@ import { unstable_cache } from 'next/cache'
 import { defaultLayouts } from '@/context/data-provider'
 import { formatTimestamp } from '@/lib/date-utils'
 import { v5 as uuidv5 } from 'uuid'
+import fs from 'fs'
 
 type TradeError =
   | 'DUPLICATE_TRADES'
@@ -83,46 +84,47 @@ export async function saveTradesAction(data: Trade[]): Promise<TradeResponse> {
   try {
     // Clean the data to remove undefined values and ensure all required fields are present
     const userAssignedTrades = data.map(trade => {
-
+      // Mongo ObjectId is generated automatically; drop incoming id
+      const { id: _ignoredId, ...rest } = trade as any
       return {
-        ...trade,
+        ...rest,
         userId: userId,
-        id: generateTradeUUID({...trade, userId: userId}), // Generate a unique ID for the trade using UUID v5 based on all trade properties
-      } as Trade
+      } as any
     })
 
-    const result = await prisma.trade.createMany({
-      data: userAssignedTrades,
-      skipDuplicates: true
-    })
-
-    // Log potential duplicates if no trades were added
-    if (result.count === 0) {
-      console.log('[saveTrades] No trades added. Checking for duplicates:', { attempted: data.length })
-      const tradeIds = userAssignedTrades.map(trade => trade.id)
-      const existingTrades = await prisma.trade.findMany({
-        where: { id: { in: tradeIds } },
-        select: {
-          id: true,
-          entryDate: true,
-          instrument: true
-        }
+    // filter out duplicates already in DB (same instrument, entryDate, closeDate, side, quantity)
+    let skippedDuplicates = 0
+    const uniqueTrades: Trade[] = []
+    for (const trade of userAssignedTrades as Trade[]) {
+      const existing = await prisma.trade.findFirst({
+        where: {
+          userId: userId,
+          instrument: trade.instrument,
+          entryDate: trade.entryDate,
+          closeDate: trade.closeDate,
+          side: trade.side ?? '',
+          quantity: trade.quantity,
+        },
+        select: { id: true },
       })
-
-      if (existingTrades.length > 0) {
-        console.log('[saveTrades] Found existing trades:', existingTrades)
-        return {
-          error: 'DUPLICATE_TRADES',
-          numberOfTradesAdded: 0,
-          details: existingTrades
-        }
-      }
+      if (!existing) uniqueTrades.push(trade)
+      else skippedDuplicates++
     }
 
+    let createdCount = 0
+    if (uniqueTrades.length > 0) {
+      const result = await prisma.trade.createMany({
+        data: uniqueTrades,
+      })
+      createdCount = result.count
+    }
+
+    // Log potential duplicates if no trades were added
     revalidatePath('/')
     return {
-      error: result.count === 0 ? 'NO_TRADES_ADDED' : false,
-      numberOfTradesAdded: result.count
+      error: createdCount === 0 && skippedDuplicates > 0 ? 'DUPLICATE_TRADES' : false,
+      numberOfTradesAdded: createdCount,
+      details: { skippedDuplicates }
     }
   } catch (error) {
     console.error('[saveTrades] Database error:', error)
@@ -132,6 +134,113 @@ export async function saveTradesAction(data: Trade[]): Promise<TradeResponse> {
       details: error instanceof Error ? error.message : 'Unknown error'
     }
   }
+}
+
+export async function removeDuplicateTradesAction(): Promise<{ removed: number }> {
+  const userId = await getUserId()
+  const trades = await prisma.trade.findMany({
+    where: { userId },
+    select: {
+      id: true,
+      instrument: true,
+      entryDate: true,
+      closeDate: true,
+      side: true,
+      quantity: true,
+      entryPrice: true,
+      closePrice: true,
+    },
+  })
+
+  const seen = new Set<string>()
+  const toDelete: string[] = []
+  for (const t of trades) {
+    const key = [
+      t.instrument,
+      t.entryDate,
+      t.closeDate,
+      t.side ?? '',
+      t.quantity,
+      t.entryPrice,
+      t.closePrice,
+    ].join('|')
+    if (seen.has(key)) {
+      toDelete.push(t.id)
+    } else {
+      seen.add(key)
+    }
+  }
+
+  if (toDelete.length) {
+    await prisma.trade.deleteMany({ where: { id: { in: toDelete }, userId } })
+    revalidatePath('/')
+  }
+
+  return { removed: toDelete.length }
+}
+
+/**
+ * Creates a JSON snapshot of key collections for backup.
+ * Currently includes trades and tick details; extend as needed.
+ */
+export async function backupDatabaseAction(): Promise<{ blob: string }> {
+  const userId = await getUserId()
+
+  const [trades, tickDetails] = await Promise.all([
+    prisma.trade.findMany({ where: { userId }, }),
+    prisma.tickDetails.findMany(),
+  ])
+
+  const snapshot = {
+    version: 1,
+    createdAt: new Date().toISOString(),
+    userId,
+    trades,
+    tickDetails,
+  }
+
+  return { blob: JSON.stringify(snapshot, null, 2) }
+}
+
+/**
+ * Restores a JSON snapshot.
+ * Warning: existing trades and tick details for the user are removed before restore.
+ */
+export async function restoreDatabaseAction(snapshotString: string): Promise<{ restoredTrades: number; restoredTickDetails: number }> {
+  const userId = await getUserId()
+  let snapshot: any
+  try {
+    snapshot = JSON.parse(snapshotString)
+  } catch (e) {
+    throw new Error('Invalid backup file')
+  }
+
+  const trades = Array.isArray(snapshot.trades) ? snapshot.trades : []
+  const tickDetails = Array.isArray(snapshot.tickDetails) ? snapshot.tickDetails : []
+
+  // Wipe existing data for user
+  await prisma.trade.deleteMany({ where: { userId } })
+  await prisma.tickDetails.deleteMany({})
+
+  // Re-insert
+  let tradeCount = 0
+  if (trades.length) {
+    const normalized = trades.map((t: any) => ({
+      ...t,
+      userId,
+    }))
+    const res = await prisma.trade.createMany({ data: normalized })
+    tradeCount = res.count
+  }
+
+  let tickCount = 0
+  if (tickDetails.length) {
+    const res = await prisma.tickDetails.createMany({ data: tickDetails })
+    tickCount = res.count
+  }
+
+  revalidatePath('/')
+  return { restoredTrades: tradeCount, restoredTickDetails: tickCount }
 }
 
 // Create cache function dynamically for each user/subscription combination
@@ -172,8 +281,7 @@ export async function getTradesAction(userId: string | null = null, forceRefresh
     throw new Error('User not found')
   }
 
-  const subscriptionDetails = await getSubscriptionDetails()
-  const isSubscribed = subscriptionDetails?.isActive || false
+  const isSubscribed = true // subscription checks disabled
 
   // If forceRefresh is true, bypass cache and fetch directly
   if (forceRefresh) {
@@ -186,11 +294,7 @@ export async function getTradesAction(userId: string | null = null, forceRefresh
       },
       orderBy: { entryDate: 'desc' }
     }
-    if (!isSubscribed) {
-      const twoWeeksAgo = startOfDay(new Date())
-      twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14)
-      query.where.entryDate = { gte: twoWeeksAgo.toISOString() }
-    }
+    // no subscription gating
 
     const trades = await prisma.trade.findMany(query)
     console.log(`[getTrades] Force refresh - Found ${trades.length} trades`)
@@ -209,11 +313,7 @@ export async function getTradesAction(userId: string | null = null, forceRefresh
       userId: userId || user?.id,
     }
   }
-  if (!isSubscribed) {
-    const twoWeeksAgo = startOfDay(new Date())
-    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14)
-    query.where.entryDate = { gte: twoWeeksAgo.toISOString() }
-  }
+  // no subscription gating
   const count = await prisma.trade.count(query)
   // Split pages by chunks of 1000
   const chunkSize = 1000

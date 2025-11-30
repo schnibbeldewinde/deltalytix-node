@@ -1,8 +1,9 @@
 import { tool } from "ai";
 import { generateObject } from "ai";
-import { openai } from "@ai-sdk/openai";
+import { createOpenAI } from "@ai-sdk/openai";
 import { z } from 'zod/v3';
 import { AccountAnalysisSchema, type AccountAnalysis } from './get-account-performance';
+import { resolveOpenAIKey } from '@/app/api/ai/utils/resolve-openai-key'
 
 // Define the simplified schema for the structured analysis output (4 parts only)
 const AnalysisOutputSchema = z.object({
@@ -29,6 +30,10 @@ export const generateAnalysisComponent = tool({
     accountData: AccountAnalysis;
   }) => {
     console.log(`[generateAnalysisComponent] Generating structured AI analysis for accounts analysis for ${username} in ${locale}`);
+    const apiKey = await resolveOpenAIKey()
+    if (!apiKey) {
+      throw new Error('OpenAI API key is missing. Bitte in den Settings speichern.')
+    }
     
     // Generate timestamp
     const now = new Date().toISOString();
@@ -80,9 +85,10 @@ Be concise and actionable. Maximum 3-5 points per section.
 Please provide a comprehensive structured analysis that would be valuable for a trader looking to improve their performance.`;
 
     try {
+      const openaiClient = createOpenAI({ apiKey })
       // Generate structured AI analysis using generateObject
       const { object } = await generateObject({
-        model: openai('gpt-5-nano-2025-08-07'),
+        model: openaiClient('gpt-5-nano-2025-08-07'),
         prompt: analysisPrompt,
         schema: AnalysisOutputSchema,
       });

@@ -100,7 +100,10 @@ export default function TradeExportDialog({ trades }: Props) {
         trade.userId,
         trade.side,
         trade.commission,
-        trade.createdAt.toISOString(),
+        (() => {
+          const d = trade.createdAt instanceof Date ? trade.createdAt : new Date(trade.createdAt)
+          return isNaN(d.getTime()) ? '' : d.toISOString()
+        })(),
         `"${trade.comment || ''}"`  // Wrap comment in quotes to handle potential commas
       ].join(','))
     ].join('\n')
@@ -306,8 +309,8 @@ export default function TradeExportDialog({ trades }: Props) {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {currentTrades.map((trade) => (
-                        <TableRow key={`${trade.entryId}-${trade.closeId}`}>
+                      {currentTrades.map((trade, idx) => (
+                        <TableRow key={`${trade.entryId ?? 'noentry'}-${trade.closeId ?? 'noclose'}-${trade.instrument ?? 'inst'}-${trade.formattedEntryDate ?? 'date'}-${idx}`}>
                           <TableCell>{trade.accountNumber}</TableCell>
                           <TableCell>{trade.instrument}</TableCell>
                           <TableCell>{trade.side}</TableCell>

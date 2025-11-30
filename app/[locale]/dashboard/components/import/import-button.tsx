@@ -296,6 +296,7 @@ export default function ImportButton() {
           isLoading={isLoading}
           headers={headers}
           mappings={mappings}
+          disableAiFormatting={platform.disableAiFormatting || false}
         />
       )
     }
@@ -375,7 +376,7 @@ export default function ImportButton() {
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="flex flex-col max-w-[80vw] h-[80vh] p-0">
+        <DialogContent className="flex flex-col max-w-[960px] w-[90vw] h-[70vh] p-0">
           <ImportDialogHeader step={step} importType={importType} />
 
           <div className="flex-1 overflow-hidden p-6">

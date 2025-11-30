@@ -15,44 +15,6 @@ interface PlatformTutorialProps {
 
 export function PlatformTutorial({ selectedPlatform, setIsOpen }: PlatformTutorialProps) {
   const t = useI18n()
-  const videoRef = useRef<HTMLVideoElement>(null)
-
-  // Reset and handle video when platform changes
-  useEffect(() => {
-    const video = videoRef.current
-    if (!video) return
-
-    // Reset video state
-    video.pause()
-    video.currentTime = 0
-
-    // Handle new platform video
-    if (selectedPlatform?.videoUrl) {
-      // Load and play the new video
-      video.load()
-      const playVideo = () => {
-        video.play().catch((error) => {
-          console.error('Video playback error:', error)
-        })
-      }
-
-      // Play video when it's ready
-      if (video.readyState >= 2) {
-        playVideo()
-      } else {
-        video.addEventListener('loadeddata', playVideo, { once: true })
-      }
-    }
-
-    // Cleanup
-    return () => {
-      if (video) {
-        video.pause()
-        video.removeEventListener('loadeddata', () => {})
-      }
-    }
-  }, [selectedPlatform])
-
   if (!selectedPlatform) return null
 
   return (
@@ -71,38 +33,9 @@ export function PlatformTutorial({ selectedPlatform, setIsOpen }: PlatformTutori
           </Button>
         )}
       </div>
-          {selectedPlatform.videoUrl ? (
-      <div className="aspect-video rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 transition-transform duration-300 hover:scale-[1.02]">
-        <div className="aspect-video rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
-            <video
-              ref={videoRef}
-              height="600"
-              width="600"
-              preload="metadata"
-              loop
-              muted
-              controls
-              playsInline
-              className="rounded-lg border border-gray-200 dark:border-gray-800 shadow-lg w-full h-full object-cover"
-            >
-              <source src={selectedPlatform.videoUrl} type="video/mp4" />
-              <track
-                src="/path/to/captions.vtt"
-                kind="subtitles"
-                srcLang="en"
-                label="English"
-              />
-              Your browser does not support the video tag.
-            </video>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          {selectedPlatform.videoUrl 
-            ? t('import.type.tutorial.description', { platform: selectedPlatform.type.split('-').join(' ') })
-            : t('import.type.tutorial.notAvailable', { platform: selectedPlatform.type.split('-').join(' ') })
-          }
-        </p>
+      <div className="aspect-video rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 transition-transform duration-300 hover:scale-[1.02] flex items-center justify-center text-sm text-muted-foreground">
+        {t('import.type.tutorial.notAvailable', { platform: selectedPlatform.type.split('-').join(' ') })}
       </div>
-          ) : null}
 
       {selectedPlatform.details && (
         <div className="text-sm text-muted-foreground flex items-start gap-2 bg-muted/50 p-4 rounded-lg transition-all duration-300 hover:bg-muted/70 animate-in slide-in-from-bottom-4">

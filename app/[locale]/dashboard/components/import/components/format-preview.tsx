@@ -45,6 +45,7 @@ interface FormatPreviewProps {
   isLoading: boolean;
   headers: string[];
   mappings: { [key: string]: string };
+  disableAiFormatting?: boolean;
 }
 
 function transformHeaders(headers: string[], mappings: { [key: string]: string }): string[] {
@@ -97,6 +98,7 @@ export function FormatPreview({
   isLoading,
   headers,
   mappings,
+  disableAiFormatting = false,
 }: FormatPreviewProps) {
   const t = useI18n();
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -104,8 +106,11 @@ export function FormatPreview({
   // Transform headers using mappings - get the destination columns in the correct order
   const transformedHeaders = useMemo(() => {
     const destinationColumns = [...new Set(Object.values(mappings))];
+    if (destinationColumns.length === 0) {
+      return headers;
+    }
     return destinationColumns;
-  }, [mappings]);
+  }, [mappings, headers]);
 
   // Calculate valid trades only when initialTrades changes
   const validTrades = useMemo(() =>
@@ -169,6 +174,50 @@ export function FormatPreview({
   useEffect(() => {
     isStoppedRef.current = isStopped;
   }, [isStopped]);
+
+  // Bypass AI formatting for deterministic platforms (e.g., Sierra)
+  useEffect(() => {
+    if (!disableAiFormatting) return;
+    const destinationHeaders = transformedHeaders.length ? transformedHeaders : headers;
+    const rowsToUse = Object.keys(mappings).length > 0
+      ? transformRowData(validTrades, headers, mappings)
+      : validTrades;
+    const numFields = new Set(['quantity', 'pnl', 'commission', 'timeInPosition']);
+    const tradesConverted: Partial<Trade>[] = rowsToUse.map((row) => {
+      const t: any = {};
+      destinationHeaders.forEach((h, i) => {
+        const val = row[i] ?? '';
+        if (numFields.has(h)) {
+          t[h] = parseFloat(val as string) || 0;
+        } else if (h === 'entryPrice' || h === 'closePrice') {
+          t[h] = val !== undefined && val !== null ? String(val) : '';
+        } else if (h === 'entryDate' || h === 'closeDate') {
+          const raw = (val as string).replace(/\.\d+Z$/, 'Z')
+          const d = new Date(raw)
+          if (!isNaN(d.getTime())) {
+            const iso = d.toISOString()
+            const parts = iso.split('T')
+            const time = parts[1].replace(/\.\d{3}Z$/, 'Z')
+            t[h] = `${parts[0]}T${time}`
+          } else {
+            t[h] = raw
+          }
+        } else if (h === 'side') {
+          t[h] = (val as string).toLowerCase();
+        } else {
+          t[h] = val;
+        }
+      });
+      return t;
+    });
+    setProcessedTrades(tradesConverted);
+    setCompletedBatches(new Set(Array.from({ length: totalBatches }, (_, i) => i)));
+    setProcessingBatches(new Set());
+    setIsAutoProcessing(false);
+    setIsStopped(true);
+    setError(null);
+    setIsLoading(false);
+  }, [disableAiFormatting, validTrades, headers, mappings, transformedHeaders, totalBatches, setProcessedTrades, setIsLoading]);
 
   // Split batches into two sets
   const splitBatches = () => {
@@ -753,7 +802,7 @@ export function FormatPreview({
             </Button>
           )}
           
-          {isAutoProcessing && (
+          {!disableAiFormatting && isAutoProcessing && (
             <Button
               onClick={stopProcessing}
               variant="destructive"
@@ -762,7 +811,7 @@ export function FormatPreview({
             </Button>
           )}
           
-          {!isAutoProcessing && completedBatches.size > 0 && (
+          {!disableAiFormatting && !isAutoProcessing && completedBatches.size > 0 && (
         <Button
               onClick={startProcessing}
               disabled={isProcessing}
@@ -772,6 +821,7 @@ export function FormatPreview({
         </Button>
           )}
           
+          {!disableAiFormatting && (
           <Button
             onClick={resetProcessing}
             disabled={isProcessing}
@@ -780,6 +830,7 @@ export function FormatPreview({
         >
           {t('import.processing.reset')}
           </Button>
+          )}
         </div>
       </div>
       

@@ -40,6 +40,9 @@ export function ColumnConfigDialog({ tableId, trigger }: ColumnConfigDialogProps
 
   const tableConfig = tables[tableId]
   const columns = tableConfig?.columns || []
+  const visibleColumns = [...columns]
+    .filter((c) => c.id !== 'videoUrl')
+    .sort((a, b) => a.order - b.order)
 
   const handleColumnToggle = (columnId: string, visible: boolean) => {
     updateColumnVisibility(tableId, columnId, visible)
@@ -67,14 +70,14 @@ export function ColumnConfigDialog({ tableId, trigger }: ColumnConfigDialogProps
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{t('trade-table.resetConfig')}</DialogTitle>
+          <DialogTitle>Configuration</DialogTitle>
           <DialogDescription>
-            {t('trade-table.resetConfigDescription')}
+            Choose which columns are visible in the table.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="space-y-3">
-            {columns.map((column) => (
+            {visibleColumns.map((column) => (
               <div key={column.id} className="flex items-center space-x-2">
                 <Checkbox
                   id={column.id}
@@ -98,7 +101,7 @@ export function ColumnConfigDialog({ tableId, trigger }: ColumnConfigDialogProps
             <AlertDialogTrigger asChild>
               <Button variant="outline" className="w-[180px] h-10">
                 <RotateCcw className="h-4 w-4 mr-2" />
-                {t('trade-table.resetConfig')}
+                Reset Configuration
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>

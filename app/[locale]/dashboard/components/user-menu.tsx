@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useI18n, useChangeLocale, useCurrentLocale } from '@/locales/client'
+import { useI18n, useCurrentLocale } from '@/locales/client'
 import { useTheme } from '@/context/theme-provider'
 import { useData } from '@/context/data-provider'
 import { useUserStore } from '@/store/user-store'
@@ -24,8 +24,6 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Slider } from '@/components/ui/slider'
 import {
-  LifeBuoy,
-  CreditCard,
   Database,
   LogOut,
   Globe,
@@ -36,9 +34,7 @@ import {
   Sun,
   Laptop,
   Settings,
-  Building2,
 } from 'lucide-react'
-import { SubscriptionBadge } from './subscription-badge'
 import { signOut } from '@/server/auth'
 import { useMemo } from 'react'
 
@@ -57,18 +53,13 @@ const timezones = [
 
 export default function UserMenu() {
   const t = useI18n()
-  const changeLocale = useChangeLocale()
   const currentLocale = useCurrentLocale()
+  const localePrefix = "/en"
   const { theme, setTheme, intensity, setIntensity } = useTheme()
   const { refreshTrades } = useData()
   const user = useUserStore(state => state.supabaseUser)
   const timezone = useUserStore(state => state.timezone)
   const setTimezone = useUserStore(state => state.setTimezone)
-
-  const languages: { value: Locale; label: string }[] = useMemo(() => ([
-    { value: 'en', label: 'English' },
-    { value: 'fr', label: 'Français' },
-  ]), [])
 
   const handleThemeChange = (value: string) => {
     setTheme(value as 'light' | 'dark' | 'system')
@@ -90,12 +81,11 @@ export default function UserMenu() {
         <DropdownMenuTrigger asChild>
           <div className="relative inline-block">
             <Avatar className="cursor-pointer h-8 w-8">
-              <AvatarImage src={user?.user_metadata.avatar_url} />
+              <AvatarImage src={undefined} />
               <AvatarFallback className="uppercase text-xs bg-secondary text-secondary-foreground">
-                {user?.email![0]}
+                {user?.email ? user.email[0] : "?"}
               </AvatarFallback>
             </Avatar>
-            <SubscriptionBadge className="absolute -bottom-1 -right-1 px-1 py-0 text-[10px] leading-3" />
           </div>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-56">
@@ -104,7 +94,7 @@ export default function UserMenu() {
             {user?.email}
           </div>
           <DropdownMenuItem asChild>
-            <Link href="/dashboard">
+            <Link href={`${localePrefix}/dashboard`}>
               <div className="flex items-center w-full">
                 <LayoutDashboard className="mr-2 h-4 w-4" />
                 <span>{t('landing.navbar.dashboard')}</span>
@@ -113,7 +103,7 @@ export default function UserMenu() {
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link href="/dashboard/settings">
+            <Link href={`${localePrefix}/dashboard/settings`}>
               <div className="flex items-center w-full">
                 <Settings className="mr-2 h-4 w-4" />
                 <span>{t('dashboard.settings')}</span>
@@ -121,16 +111,8 @@ export default function UserMenu() {
               </div>
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href="/dashboard/billing">
-              <div className="flex items-center w-full">
-                <CreditCard className="mr-2 h-4 w-4" />
-                <span>{t('dashboard.billing')}</span>
-                <DropdownMenuShortcut>⌘B</DropdownMenuShortcut>
-              </div>
-            </Link>
-          </DropdownMenuItem>
-          <Link href="/dashboard/data">
+          {/* Billing removed */}
+          <Link href={`${localePrefix}/dashboard/data`}>
             <DropdownMenuItem className="flex items-center">
               <Database className="mr-2 h-4 w-4" />
               <span>{t('dashboard.data')}</span>
@@ -142,21 +124,7 @@ export default function UserMenu() {
             <span>{t('dashboard.refreshData')}</span>
             <DropdownMenuShortcut>⌘R</DropdownMenuShortcut>
           </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href="/business/dashboard">
-              <div className="flex items-center w-full">
-                <Building2 className="mr-2 h-4 w-4" />
-                <span>{t('dashboard.business')}</span>
-              </div>
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <Link href="/support">
-            <DropdownMenuItem className="flex items-center">
-              <LifeBuoy className="mr-2 h-4 w-4" />
-              <span>{t('dashboard.support')}</span>
-            </DropdownMenuItem>
-          </Link>
+          {/* Business removed */}
           <DropdownMenuSeparator />
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
@@ -197,31 +165,7 @@ export default function UserMenu() {
               </DropdownMenuSubContent>
             </DropdownMenuPortal>
           </DropdownMenuSub>
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <Globe className="mr-2 h-4 w-4" />
-              <span>{t('dashboard.language')}</span>
-            </DropdownMenuSubTrigger>
-            <DropdownMenuPortal>
-              <DropdownMenuSubContent>
-                <ScrollArea className="h-[64px]">
-                  <DropdownMenuRadioGroup value={currentLocale}>
-                    {languages.map((lang) => (
-                      <DropdownMenuRadioItem
-                        key={lang.value}
-                        value={lang.value}
-                        onClick={() => {
-                          changeLocale(lang.value)
-                        }}
-                      >
-                        {lang.label}
-                      </DropdownMenuRadioItem>
-                    ))}
-                  </DropdownMenuRadioGroup>
-                </ScrollArea>
-              </DropdownMenuSubContent>
-            </DropdownMenuPortal>
-          </DropdownMenuSub>
+          {/* Language selector removed (fixed to English) */}
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
               <Clock className="mr-2 h-4 w-4" />

@@ -56,7 +56,7 @@ function createTablePreview(type: 'tradeTableReview' | 'consistencyTable') {
     <Card className="h-[300px]">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-medium">
-          {type === 'tradeTableReview' ? 'Trade Review' : 'Consistency Analysis'}
+          {type === 'tradeTableReview' ? 'Trade View' : 'Consistency Analysis'}
         </CardTitle>
       </CardHeader>
       <CardContent className="pb-2">

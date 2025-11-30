@@ -214,7 +214,7 @@ export default {
   "analysis.summary": "Summary",
   "analysis.strengths": "Strengths",
   "analysis.improvements": "Areas for Improvement",
-  "import.button": "Import Trades",
+  "import.button": "Import",
   "import.title.selectType": "Select Import Type",
   "import.title.upload": "Upload CSV",
   "import.title.connect": "Connect",

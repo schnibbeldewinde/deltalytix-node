@@ -2,8 +2,6 @@
 import { ThemeProvider } from "@/context/theme-provider";
 import { Metadata } from 'next';
 import { Suspense } from "react";
-import { AuthProfileButton } from "./components/auth-profile-button";
-import { AuthProfileButtonSkeleton } from "./components/auth-profile-button-skeleton";
 
 type Locale = 'en' | 'fr';
 

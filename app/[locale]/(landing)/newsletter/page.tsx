@@ -14,7 +14,7 @@ export default async function NewsletterPage(
   }
 ) {
   const searchParams = await props.searchParams;
-  const t = await getScopedI18n('newsletter')
+  const t = await getScopedI18n()
 
   const isUnsubscribed = searchParams?.status === "unsubscribed"
   const email = searchParams?.email
@@ -28,15 +28,15 @@ export default async function NewsletterPage(
               <CardHeader className="space-y-3 sm:space-y-4">
                 <div className="flex items-center space-x-2.5">
                   <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" />
-                  <CardTitle className="text-lg sm:text-xl">{t("unsubscribed.title")}</CardTitle>
+                  <CardTitle className="text-lg sm:text-xl">{t("newsletter.unsubscribed.title")}</CardTitle>
                 </div>
                 <CardDescription className="text-green-700 dark:text-green-300 text-sm sm:text-base">
-                  {t("unsubscribed.description")}
+                  {t("newsletter.unsubscribed.description")}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <p className="text-sm sm:text-base text-green-600 dark:text-green-400 break-all">
-                  {email && `${t("unsubscribed.email")}: ${email}`}
+                  {email && `${t("newsletter.unsubscribed.email")}: ${email}`}
                 </p>
               </CardContent>
             </Card>
@@ -44,12 +44,12 @@ export default async function NewsletterPage(
 
           <Card className="shadow-xs">
             <CardHeader className="space-y-3 sm:space-y-4">
-              <CardTitle className="text-lg sm:text-xl">{t("preferences.title")}</CardTitle>
-              <CardDescription className="text-sm sm:text-base">{t("preferences.description")}</CardDescription>
+              <CardTitle className="text-lg sm:text-xl">{t("newsletter.preferences.title")}</CardTitle>
+              <CardDescription className="text-sm sm:text-base">{t("newsletter.preferences.description")}</CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-sm sm:text-base text-muted-foreground">
-                {t("preferences.comingSoon")}
+                {t("newsletter.preferences.comingSoon")}
               </p>
             </CardContent>
           </Card>

@@ -234,9 +234,7 @@ export function AccountsAnalysis({ onStatusChange }: AccountsAnalysisProps) {
                     {
                       body: {
                         username:
-                          supabaseUser?.user_metadata?.full_name ||
-                          supabaseUser?.email?.split("@")[0] ||
-                          "User",
+                          supabaseUser?.email?.split("@")[0] || "User",
                         locale: currentLocale,
                         timezone: timezone,
                         currentTime: new Date().toISOString(),

@@ -135,7 +135,7 @@ export default function GitHubRepoCard() {
       <div className="mb-6 md:mb-12">
         <h2 className="text-2xl md:text-3xl lg:text-4xl mb-2 md:mb-4 font-medium text-primary">{t('landing.openSource.title')}</h2>
         <p className="text-sm md:text-base text-muted-foreground max-w-[500px]">
-          {t('landing.openSource.description').split('code').map((part, index, array) => 
+          {t('landing.openSource.description').split('code').map((part: string, index: number) => 
             index === 1 ? (
               <React.Fragment key={index}>
                 <a 

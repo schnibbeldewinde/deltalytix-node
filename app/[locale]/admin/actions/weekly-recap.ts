@@ -1,17 +1,10 @@
 'use server'
 import { render } from "@react-email/render"
 import TraderStatsEmail from "@/components/emails/weekly-recap"
-import { PrismaClient } from "@prisma/client"
-import { createClient } from '@supabase/supabase-js'
 import { generateTradingAnalysis } from "@/app/api/email/weekly-summary/[userid]/actions/analysis"
 import { getUserData, computeTradingStats } from "@/app/api/email/weekly-summary/[userid]/actions/user-data"
+import { prisma } from "@/lib/prisma"
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-})
 
 export interface WeeklyRecapContent {
   firstName: string
@@ -134,33 +127,13 @@ export async function loadInitialContent(email?: string, userId?: string) {
 }
 
 export async function listUsers() {
-  let allUsers: any[] = []
-  let page = 1
-  const perPage = 1000
-  let hasMore = true
+  const users = await prisma.user.findMany({
+    select: { id: true, email: true, createdAt: true },
+  })
 
-  while (hasMore) {
-    const { data, error } = await supabase.auth.admin.listUsers({
-      page,
-      perPage
-    })
-
-    if (error) {
-      console.error('Error fetching users:', error)
-      break
-    }
-
-    if (data.users.length === 0) {
-      hasMore = false
-    } else {
-      allUsers = [...allUsers, ...data.users]
-      page++
-    }
-  }
-
-  return allUsers.map(user => ({
+  return users.map(user => ({
     id: user.id,
     email: user.email,
-    created_at: user.created_at
+    created_at: user.createdAt?.toISOString() || ''
   }))
-} 
+}

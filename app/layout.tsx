@@ -9,84 +9,22 @@ import { ReactNode } from "react";
 
 const inter = Inter({ subsets: ["latin"] });
 
-type Props = {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+export const metadata: Metadata = {
+  title: 'Deltalytix',
+  description: 'Next generation trading dashboard',
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/icon.png', type: 'image/png', sizes: '32x32' },
+    ],
+    apple: [{ url: '/apple-icon.png', sizes: '180x180', type: 'image/png' }],
+    other: [
+      { rel: 'mask-icon', url: '/safari-pinned-tab.svg', color: '#000000' },
+      { rel: 'android-chrome', sizes: '192x192', url: '/android-chrome-192x192.png' },
+      { rel: 'android-chrome', sizes: '512x512', url: '/android-chrome-512x512.png' },
+    ],
+  },
 };
-
-export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
-  const params = searchParams ? await searchParams : undefined;
-  const ref = (params?.ref as string) ?? '';
-
-  // Build the dynamic image URL (works locally & in production)
-  const base = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://deltalytix.app';
-  const ogUrl = `${base}/api/og${ref ? `?ref=${encodeURIComponent(ref)}` : ''}`;
-
-  return {
-    title: 'Deltalytix',
-    description: 'Next generation trading dashboard',
-    metadataBase: new URL('https://deltalytix.app'),
-
-    // ---------- OPEN GRAPH ----------
-    openGraph: {
-      title: 'Deltalytix',
-      description:
-        'Deltalytix is a next generation trading dashboard that provides real-time insights and analytics for traders.',
-      images: [
-        {
-          url: ref ? ogUrl : '/opengraph-image.png', // dynamic when ref exists
-          width: 1200,
-          height: 630,
-          alt: 'Deltalytix Open Graph Image',
-        }
-      ],
-    },
-
-    // ---------- TWITTER ----------
-    twitter: {
-      card: 'summary_large_image',
-      title: 'Deltalytix',
-      description: 'Next generation trading dashboard',
-      images: [ref ? ogUrl : '/twitter-image.png'],
-    },
-
-    // ---------- ICONS ----------
-    icons: {
-      icon: [
-        { url: '/favicon.ico', sizes: 'any' },
-        { url: '/icon.png', type: 'image/png', sizes: '32x32' },
-      ],
-      apple: [{ url: '/apple-icon.png', sizes: '180x180', type: 'image/png' }],
-      other: [
-        { rel: 'mask-icon', url: '/safari-pinned-tab.svg', color: '#000000' },
-        { rel: 'android-chrome', sizes: '192x192', url: '/android-chrome-192x192.png' },
-        { rel: 'android-chrome', sizes: '512x512', url: '/android-chrome-512x512.png' },
-      ],
-    },
-
-    // ---------- PWA ----------
-    manifest: '/site.webmanifest',
-
-    // ---------- ROBOTS ----------
-    robots: {
-      index: true,
-      follow: true,
-      googleBot: {
-        index: true,
-        follow: true,
-        'max-video-preview': -1,
-        'max-image-preview': 'large',
-        'max-snippet': -1,
-      },
-    },
-
-    // ---------- OTHER ----------
-    other: { google: 'notranslate' },
-    authors: [{ name: 'Hugo DEMENEZ' }],
-    creator: 'Hugo DEMENEZ',
-    publisher: 'Hugo DEMENEZ',
-    formatDetection: { email: false, address: false, telephone: false },
-  };
-}
 
 export default async function RootLayout({
   children,

@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { CopyIcon, RefreshCwIcon, EyeIcon } from "lucide-react"
-import { useState, useRef, useEffect } from "react"
+import { useState } from "react"
 import { generateEtpToken } from "./action"
 import { toast } from "sonner"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -28,39 +28,6 @@ export function EtpSync({ setIsOpen }: { setIsOpen: (isOpen: boolean) => void })
   const user = useUserStore(state => state.user)
   const setUser = useUserStore(state => state.setUser)
   const t = useI18n()
-  const videoRef = useRef<HTMLVideoElement>(null)
-
-  // Handle video playback
-  useEffect(() => {
-    const video = videoRef.current
-    if (!video) return
-
-    // Reset video state
-    video.pause()
-    video.currentTime = 0
-
-    // Play video when component mounts
-    const playVideo = () => {
-      video.play().catch((error) => {
-        console.error('Video playback error:', error)
-      })
-    }
-
-    // Play video when it's ready
-    if (video.readyState >= 2) {
-      playVideo()
-    } else {
-      video.addEventListener('loadeddata', playVideo, { once: true })
-    }
-
-    // Cleanup
-    return () => {
-      if (video) {
-        video.pause()
-        video.removeEventListener('loadeddata', () => {})
-      }
-    }
-  }, [])
 
   const handleGenerateToken = async () => {
     try {
@@ -161,31 +128,9 @@ export function EtpSync({ setIsOpen }: { setIsOpen: (isOpen: boolean) => void })
 
       <div className="mt-8 space-y-4">
         <h2 className="text-2xl font-bold">{t('etp.tutorial.title')}</h2>
-        <div className="aspect-video rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 transition-transform duration-300 hover:scale-[1.02]">
-          <video
-            ref={videoRef}
-            height="600"
-            width="600"
-            preload="metadata"
-            loop
-            muted
-            controls
-            playsInline
-            className="rounded-lg border border-gray-200 dark:border-gray-800 shadow-lg w-full h-full object-cover"
-          >
-            <source src="/videos/etp-tutorial.mp4" type="video/mp4" />
-            <track
-              src="/path/to/captions.vtt"
-              kind="subtitles"
-              srcLang="en"
-              label="English"
-            />
-            Your browser does not support the video tag.
-          </video>
-        </div>
-        <p className="text-sm text-muted-foreground">
+        <div className="aspect-video rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 transition-transform duration-300 hover:scale-[1.02] flex items-center justify-center text-sm text-muted-foreground">
           {t('etp.tutorial.description')}
-        </p>
+        </div>
       </div>
     </div>
   )

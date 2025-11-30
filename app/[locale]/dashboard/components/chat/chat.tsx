@@ -235,11 +235,11 @@ export default function ChatWidget({ size = "large" }: ChatWidgetProps) {
 
 
     const { messages, sendMessage, status, stop, setMessages, addToolResult, error } =
-        useChat({
+                useChat({
             transport: new DefaultChatTransport({
                 api: "/api/ai/chat",
                 body: {
-                    username: user?.user_metadata?.full_name || user?.email?.split('@')[0] || "User",
+                    username: user?.email?.split('@')[0] || "User",
                     locale: locale,
                     timezone,
                 },

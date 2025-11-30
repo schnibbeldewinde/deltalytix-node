@@ -116,8 +116,8 @@ export default function TradezellaProcessor({ headers, csvData, setProcessedTrad
             </TableRow>
           </TableHeader>
           <TableBody>
-            {trades.map((trade) => (
-              <TableRow key={trade.id}>
+            {trades.map((trade, idx) => (
+              <TableRow key={trade.id ?? idx}>
                 <TableCell>{trade.instrument}</TableCell>
                 <TableCell>{trade.side}</TableCell>
                 <TableCell>{trade.quantity}</TableCell>

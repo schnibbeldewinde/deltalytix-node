@@ -118,7 +118,7 @@ export default function Home() {
           >
             <TabsList className="w-full max-w-none">
               <TabsTrigger value="widgets">{t('dashboard.tabs.widgets')}</TabsTrigger>
-              <TabsTrigger value="table">{t('dashboard.tabs.table')}</TabsTrigger>
+              <TabsTrigger value="table">Trade View</TabsTrigger>
               <TabsTrigger value="accounts">{t('dashboard.tabs.accounts')}</TabsTrigger>
               <TabsTrigger value="analysis">{t('dashboard.tabs.analysis')}</TabsTrigger>
             </TabsList>

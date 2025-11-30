@@ -38,7 +38,6 @@ import { cn, parsePositionTime } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useI18n } from "@/locales/client";
 import { TradeComment } from "./trade-comment";
-import { TradeVideoUrl } from "./trade-video-url";
 import { TradeTag } from "./trade-tag";
 import { formatInTimeZone } from "date-fns-tz";
 import {
@@ -255,7 +254,6 @@ interface ExtendedTrade extends Trade {
   imageBase64: string | null;
   imageBase64Second: string | null;
   comment: string | null;
-  videoUrl: string | null;
   trades: ExtendedTrade[];
 }
 
@@ -268,6 +266,15 @@ export function TradeTableReview({ tradesParam }: { tradesParam?: Trade[] }) {
   const timezone = useUserStore((state) => state.timezone);
   const tickDetails = useTickDetailsStore((state) => state.tickDetails);
   let contextTrades = formattedTrades;
+
+  const formatDateOnly = (val?: string) => {
+    if (!val) return "";
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) {
+      return d.toISOString().slice(0, 10);
+    }
+    return val.split("T")[0] || val;
+  };
 
   if (tradesParam) {
     contextTrades = tradesParam;
@@ -660,6 +667,23 @@ export function TradeTableReview({ tradesParam }: { tradesParam?: Trade[] }) {
         size: 120,
       },
       {
+        accessorKey: "closeDateOnly",
+        header: ({ column }) => (
+          <DataTableColumnHeader
+            column={column}
+            title="Exit Date"
+            tableId="trade-table"
+          />
+        ),
+        cell: ({ row }) => formatDateOnly(row.original.closeDate),
+        sortingFn: (rowA, rowB) => {
+          const a = rowA.original.closeDate;
+          const b = rowB.original.closeDate;
+          return (new Date(a).getTime() || 0) - (new Date(b).getTime() || 0);
+        },
+        size: 120,
+      },
+      {
         accessorKey: "instrument",
         header: ({ column }) => (
           <DataTableColumnHeader
@@ -1009,39 +1033,6 @@ export function TradeTableReview({ tradesParam }: { tradesParam?: Trade[] }) {
                     ? trade.trades[0].comment
                     : trade.comment
                 }
-              />
-            </div>
-          );
-        },
-        size: 200,
-      },
-      {
-        accessorKey: "videoUrl",
-        header: ({ column }) => (
-          <DataTableColumnHeader
-            column={column}
-            title={t("trade-table.videoUrl")}
-            tableId="trade-table"
-          />
-        ),
-        cell: ({ row }) => {
-          const trade = row.original;
-          const tradeIds =
-            trade.trades.length > 0
-              ? trade.trades.map((t) => t.id)
-              : [trade.id];
-          return (
-            <div className="min-w-[200px]">
-              <TradeVideoUrl
-                tradeIds={tradeIds}
-                videoUrl={
-                  trade.trades.length > 0
-                    ? trade.trades[0].videoUrl
-                    : trade.videoUrl
-                }
-                onVideoUrlChange={async (videoUrl) => {
-                  await updateTrades(tradeIds, { videoUrl });
-                }}
               />
             </div>
           );

@@ -57,7 +57,7 @@ const sizeToGrid = (size: WidgetSize, isSmallScreen = false): { w: number, h: nu
   // Desktop sizes
   switch (size) {
     case 'tiny':
-      return { w: 3, h: 1 }
+      return { w: 3, h: 1.5 }
     case 'small':
       return { w: 3, h: 4 }
     case 'small-long':

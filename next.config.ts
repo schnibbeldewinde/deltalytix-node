@@ -4,11 +4,7 @@ import createMDX from '@next/mdx';
 const nextConfig: NextConfig = {
   // cacheComponents: true, // Enable Cache Components (Next.js 16+)
   images: {
-    remotePatterns: [
-      {
-        hostname: 'fhvmtnvjiotzztimdxbi.supabase.co',
-      },
-    ],
+    remotePatterns: [],
   },
   pageExtensions: ['mdx', 'ts', 'tsx'],
   experimental: {

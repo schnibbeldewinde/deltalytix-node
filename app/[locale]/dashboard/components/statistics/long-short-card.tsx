@@ -1,7 +1,7 @@
 'use client'
 
 import { useData } from '@/context/data-provider'
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { ArrowLeftRight, ArrowUpFromLine, ArrowDownFromLine, HelpCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { WidgetSize } from '../../types/dashboard'
@@ -20,6 +20,7 @@ interface LongShortPerformanceCardProps {
 export default function LongShortPerformanceCard({ size = 'medium' }: LongShortPerformanceCardProps) {
   const { calendarData } = useData()
   const  t  = useI18n()
+  const title = 'Long vs Short'
 
   // Calculate long/short data
   const chartData = Object.entries(calendarData).map(([date, values]) => ({
@@ -35,18 +36,11 @@ export default function LongShortPerformanceCard({ size = 'medium' }: LongShortP
   const longRate = Number((longNumber / totalTrades * 100).toFixed(2))
   const shortRate = Number((shortNumber / totalTrades * 100).toFixed(2))
 
-    return (
-      <Card className="h-full">
-        <div className="flex items-center justify-center h-full gap-1.5">
-          <div className="flex items-center gap-1">
-            <ArrowUpFromLine className="h-3 w-3 text-green-500" />
-            <span className="font-medium text-sm">{longRate}%</span>
-          </div>
-          <span className="text-muted-foreground">/</span>
-          <div className="flex items-center gap-1">
-            <ArrowDownFromLine className="h-3 w-3 text-red-500" />
-            <span className="font-medium text-sm">{shortRate}%</span>
-          </div>
+  return (
+    <Card className="h-full bg-card/80 border-border/70 shadow-sm">
+      <CardContent className="p-4 flex flex-col gap-2">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>{title}</span>
           <TooltipProvider delayDuration={100}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -62,6 +56,21 @@ export default function LongShortPerformanceCard({ size = 'medium' }: LongShortP
             </Tooltip>
           </TooltipProvider>
         </div>
-      </Card>
-    )
-  }
+        <div className="flex items-center gap-3 text-sm font-semibold">
+          <div className="flex items-center gap-1 text-emerald-400">
+            <ArrowUpFromLine className="h-4 w-4" />
+            <span>{longRate}%</span>
+          </div>
+          <span className="text-muted-foreground/70">/</span>
+          <div className="flex items-center gap-1 text-red-400">
+            <ArrowDownFromLine className="h-4 w-4" />
+            <span>{shortRate}%</span>
+          </div>
+        </div>
+        <div className="text-xs text-muted-foreground">
+          {longNumber} {t('dashboard.statistics.long') || 'long'} / {shortNumber} {t('dashboard.statistics.short') || 'short'}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}

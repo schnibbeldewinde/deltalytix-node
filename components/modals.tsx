@@ -10,7 +10,6 @@ import { useI18n } from "@/locales/client"
 import { signOut } from '@/server/auth'
 import PricingPlans from '@/components/pricing-plans'
 import { redirect, useSearchParams } from 'next/navigation'
-import OnboardingModal from './onboarding-modal'
 import { AccountGroupBoard } from '@/app/[locale]/dashboard/components/filters/account-group-board'
 import { useModalStateStore } from '@/store/modal-state-store'
 import { useTradesStore } from '@/store/trades-store'
@@ -91,8 +90,6 @@ export default function Modals() {
   if (!user) return null
   return (
     <>
-      <OnboardingModal onDismiss={handleOnboardingDismiss} />
-
       {/* Tooltip Portal for Sheet */}
       <div id="sheet-tooltip-portal" className="fixed inset-0 pointer-events-none z-100" />
       

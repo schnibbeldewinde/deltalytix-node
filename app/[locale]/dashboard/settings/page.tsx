@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { useUserStore } from '../../../../store/user-store'
 import { useTheme } from '@/context/theme-provider'
@@ -17,22 +16,18 @@ import {
   Settings, 
   Bell, 
   Shield, 
-  Globe, 
   Moon, 
   Sun, 
   Laptop,
   Clock,
-  CreditCard,
   Database,
-  LifeBuoy,
   LogOut,
-  Building2,
   Eye,
-  EyeOff
+  EyeOff,
+  Loader2
 } from "lucide-react"
 import { signOut, setPasswordAction } from "@/server/auth"
 import Link from 'next/link'
-import { useChangeLocale, useCurrentLocale } from "@/locales/client"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   DropdownMenu,
@@ -45,7 +40,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Slider } from "@/components/ui/slider"
-import { createBusiness, joinBusiness, leaveBusiness, getUserBusinesses } from './actions'
+// Business features removed
 import { toast } from "sonner"
 import {
   AlertDialog,
@@ -59,8 +54,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { LinkedAccounts } from "@/components/linked-accounts"
-
-type Locale = 'en' | 'fr'
 
 // Add timezone list
 const timezones = [
@@ -77,8 +70,6 @@ const timezones = [
 
 export default function SettingsPage() {
   const t = useI18n()
-  const changeLocale = useChangeLocale()
-  const currentLocale = useCurrentLocale()
   const { theme, setTheme, intensity, setIntensity } = useTheme()
   const user = useUserStore(state => state.supabaseUser)
   const timezone = useUserStore(state => state.timezone)
@@ -92,18 +83,27 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [openAiKey, setOpenAiKey] = useState('')
+  const [openAiLoading, setOpenAiLoading] = useState(false)
+
+  // Release info from build-time env (NEXT_PUBLIC_*)
+  const buildNumber = process.env.NEXT_PUBLIC_BUILD_NUMBER || process.env.NEXT_PUBLIC_BUILD_VERSION || 'dev'
+  const buildDate = process.env.NEXT_PUBLIC_BUILD_DATE || ''
+
+  useEffect(() => {
+    const fetchKey = async () => {
+      try {
+        const res = await fetch('/api/openai-key')
+        if (!res.ok) throw new Error('Failed to load key')
+        const data = await res.json()
+        setOpenAiKey(data.openaiApiKey || '')
+      } catch (e) {
+        toast.error('Konnte API Key nicht laden')
+      }
+    }
+    fetchKey()
+  }, [])
   
-  // Business state
-  const [userBusinesses, setUserBusinesses] = useState<{
-    ownedBusinesses: any[]
-    joinedBusinesses: any[]
-  }>({ ownedBusinesses: [], joinedBusinesses: [] })
-
-  const languages: { value: Locale; label: string }[] = [
-    { value: 'en', label: 'English' },
-    { value: 'fr', label: 'Français' },
-  ]
-
   const handleThemeChange = (value: string) => {
     setTheme(value as "light" | "dark" | "system")
   }
@@ -117,39 +117,6 @@ export default function SettingsPage() {
     }
     return <Laptop className="h-4 w-4" />;
   };
-
-  // Load user businesses on component mount
-  useEffect(() => {
-    const loadBusinesses = async () => {
-      const result = await getUserBusinesses()
-      if (result.success && result.ownedBusinesses && result.joinedBusinesses) {
-        setUserBusinesses({
-          ownedBusinesses: result.ownedBusinesses,
-          joinedBusinesses: result.joinedBusinesses,
-        })
-      }
-    }
-    loadBusinesses()
-  }, [])
-
-
-
-  const handleLeaveBusiness = async (businessId: string) => {
-    const result = await leaveBusiness(businessId)
-    if (result.success) {
-      toast.success(t('dashboard.business.leaveSuccess'))
-      // Reload businesses
-      const updatedBusinesses = await getUserBusinesses()
-      if (updatedBusinesses.success && updatedBusinesses.ownedBusinesses && updatedBusinesses.joinedBusinesses) {
-        setUserBusinesses({
-          ownedBusinesses: updatedBusinesses.ownedBusinesses,
-          joinedBusinesses: updatedBusinesses.joinedBusinesses,
-        })
-      }
-    } else {
-      toast.error(result.error || t('dashboard.business.error'))
-    }
-  }
 
   return (
     <div className="container mx-auto py-8 px-4">
@@ -172,19 +139,13 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-4">
-              <Avatar className="h-16 w-16">
-                <AvatarImage src={user?.user_metadata.avatar_url} />
-                <AvatarFallback className="text-lg">
-                  {user?.email![0].toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
                   <h3 className="font-semibold">{user?.email}</h3>
                   <Badge variant="secondary">Active</Badge>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Member since {new Date(user?.created_at || '').toLocaleDateString()}
+                  Member since {new Date((user as any)?.createdAt || '').toLocaleDateString()}
                 </p>
               </div>
             </div>
@@ -263,39 +224,6 @@ export default function SettingsPage() {
                     <span className="text-sm text-muted-foreground w-12">{intensity}%</span>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Language Settings */}
-            <div>
-              <Label className="text-base font-medium flex items-center gap-2">
-                <Globe className="h-4 w-4" />
-                Language
-              </Label>
-              <div className="mt-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="w-[200px] justify-start">
-                      <Globe className="mr-2 h-4 w-4" />
-                      {languages.find(lang => lang.value === currentLocale)?.label}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuRadioGroup value={currentLocale}>
-                      {languages.map((lang) => (
-                        <DropdownMenuRadioItem 
-                          key={lang.value} 
-                          value={lang.value}
-                          onClick={() => changeLocale(lang.value)}
-                        >
-                          {lang.label}
-                        </DropdownMenuRadioItem>
-                      ))}
-                    </DropdownMenuRadioGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
               </div>
             </div>
 
@@ -402,106 +330,6 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Business Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5" />
-              Business
-            </CardTitle>
-            <CardDescription>
-              Manage your business connections
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-
-            {/* Current Businesses */}
-            {(userBusinesses.ownedBusinesses.length > 0 || userBusinesses.joinedBusinesses.length > 0) && (
-              <div>
-                <Label className="text-base font-medium">Current Businesses</Label>
-                <div className="mt-2 space-y-2">
-                  {/* Owned Businesses */}
-                  {userBusinesses.ownedBusinesses.map((business) => (
-                    <div key={business.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="font-medium">{business.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {business.traderIds.length} traders
-                        </p>
-                      </div>
-                      <Badge variant="secondary">Owner</Badge>
-                    </div>
-                  ))}
-                  
-                  {/* Joined Businesses */}
-                  {userBusinesses.joinedBusinesses.map((business) => (
-                    <div key={business.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="font-medium">{business.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {business.traderIds.length} traders
-                        </p>
-                      </div>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="outline" size="sm">
-                            Leave Business
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Leave Business</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to leave this business?
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleLeaveBusiness(business.id)}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
-                              Leave Business
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* No Businesses */}
-            {userBusinesses.ownedBusinesses.length === 0 && userBusinesses.joinedBusinesses.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                <p>No business linked</p>
-                <p className="text-sm mt-2">Contact your business administrator to get an invitation to join a business.</p>
-                <div className="mt-4">
-                  <Link href="/business/dashboard">
-                    <Button>
-                      <Building2 className="mr-2 h-4 w-4" />
-                      Manage Businesses
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            )}
-
-            {/* Business Management Link */}
-            {(userBusinesses.ownedBusinesses.length > 0 || userBusinesses.joinedBusinesses.length > 0) && (
-              <div className="mt-4">
-                <Link href="/business/dashboard">
-                  <Button variant="outline" className="w-full">
-                    <Settings className="mr-2 h-4 w-4" />
-                    Manage Businesses
-                  </Button>
-                </Link>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
         {/* Linked Accounts Section */}
         <LinkedAccounts />
 
@@ -594,6 +422,99 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        {/* OpenAI API Key */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              OpenAI API Key
+            </CardTitle>
+            <CardDescription>
+              Store your OpenAI API key securely in your account. You can also set it via the <code>OPENAI_API_KEY</code> in your <code>.env</code> file if you prefer.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="text-sm text-muted-foreground">
+              Current key:
+              <textarea
+                className="mt-2 w-full rounded-md border border-border bg-muted/40 p-2 text-sm font-mono text-foreground resize-none h-16"
+                readOnly
+                value={openAiKey || '—'}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="openaiKey">API Key</Label>
+              <Input
+                id="openaiKey"
+                type="text"
+                value={openAiKey}
+                onChange={(e) => setOpenAiKey(e.target.value)}
+                placeholder="sk-..."
+              />
+            </div>
+            <Button
+              variant="outline"
+              disabled={openAiLoading}
+              onClick={async () => {
+                try {
+                  setOpenAiLoading(true)
+                  const res = await fetch('/api/openai-key', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key: openAiKey })
+                  })
+                  if (!res.ok) throw new Error('Save failed')
+                  // Re-fetch to confirm persisted value
+                  try {
+                    const res = await fetch('/api/openai-key')
+                    if (res.ok) {
+                      const data = await res.json()
+                      setOpenAiKey(data.openaiApiKey || '')
+                    }
+                  } catch {}
+                  toast.success('OpenAI API key saved')
+                } catch (e) {
+                  toast.error('Saving failed')
+                } finally {
+                  setOpenAiLoading(false)
+                }
+              }}
+            >
+              {openAiLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save'
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Release Info */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Release Info
+            </CardTitle>
+            <CardDescription>
+              Build metadata injected at build time via NEXT_PUBLIC_* env variables.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Build number</span>
+              <span className="font-mono">{buildNumber}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Build date</span>
+              <span className="font-mono">{buildDate || '—'}</span>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Account Management Section */}
         <Card>
           <CardHeader>
@@ -607,22 +528,10 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4">
-              <Link href="/dashboard/billing">
-                <Button variant="outline" className="w-full justify-start">
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  Billing & Subscription
-                </Button>
-              </Link>
-              <Link href="/dashboard/data">
+              <Link href="/en/dashboard/data">
                 <Button variant="outline" className="w-full justify-start">
                   <Database className="mr-2 h-4 w-4" />
                   Data Management
-                </Button>
-              </Link>
-              <Link href="/support">
-                <Button variant="outline" className="w-full justify-start">
-                  <LifeBuoy className="mr-2 h-4 w-4" />
-                  Support & Help
                 </Button>
               </Link>
               <Separator />

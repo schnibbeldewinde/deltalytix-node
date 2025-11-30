@@ -1,7 +1,8 @@
 import { streamText, convertToModelMessages, stepCountIs } from "ai";
 import { NextRequest } from "next/server";
 import { z } from "zod/v3";
-import { openai } from "@ai-sdk/openai";
+import { createOpenAI } from "@ai-sdk/openai";
+import { resolveOpenAIKey } from '@/app/api/ai/utils/resolve-openai-key'
 import { getCurrentDayData } from "./tools/get-current-day-data";
 import { ActionSchema } from "./schema";
 import { getDayData } from "./tools/get-trading-summary";
@@ -11,7 +12,8 @@ export const maxDuration = 90;
 type EditorAction = z.infer<typeof ActionSchema>;
 
 // Model selection based on action type
-const getModelForAction = (action: EditorAction) => {
+const getModelForAction = (action: EditorAction, apiKey: string) => {
+  const openai = createOpenAI({ apiKey })
   switch (action) {
     case "explain":
       // Access latest news with up to date data
@@ -106,8 +108,13 @@ export async function POST(req: NextRequest) {
     // Validate action
     const validatedAction = ActionSchema.parse(action);
 
+    const apiKey = await resolveOpenAIKey()
+    if (!apiKey) {
+      return new Response(JSON.stringify({ error: 'OpenAI API key is missing. Bitte in den Settings speichern.' }), { status: 400 })
+    }
+
     // Select model and system prompt based on action
-    const model = getModelForAction(validatedAction);
+    const model = getModelForAction(validatedAction, apiKey);
     const systemPrompt = getSystemPrompt(validatedAction, locale, date);
     // Dynamically build tools based on criteria
     const tools: Record<string, any> = {};

@@ -1,7 +1,8 @@
 import { streamText } from "ai";
 import { NextRequest } from "next/server";
 import { z } from 'zod/v3';
-import { openai } from "@ai-sdk/openai";
+import { createOpenAI } from "@ai-sdk/openai";
+import { resolveOpenAIKey } from '@/app/api/ai/utils/resolve-openai-key'
 
 // Analysis Tools
 import { generateAnalysisComponent } from "../accounts/generate-analysis-component";
@@ -81,8 +82,17 @@ export async function POST(req: NextRequest) {
     const validatedData = analysisSchema.parse({ username, locale, timezone });
     console.log('Validated data:', validatedData);
 
+    const apiKey = await resolveOpenAIKey()
+    if (!apiKey) {
+      return new Response(JSON.stringify({ error: 'OpenAI API key is missing. Bitte in den Settings speichern.' }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      })
+    }
+    const openaiClient = createOpenAI({ apiKey })
+
     const result = streamText({
-      model: openai("gpt-4o-mini"),
+      model: openaiClient("gpt-4o-mini"),
       system: getGlobalAnalysisPrompt(validatedData.locale),
       tools: {
         generateAnalysisComponent,

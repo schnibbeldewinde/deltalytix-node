@@ -1,10 +1,12 @@
 'use client'
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
+
 interface AuthenticationLayoutProps {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 export default function AuthenticationLayout({
@@ -34,5 +36,10 @@ export default function AuthenticationLayout({
     }
   }, [router, isClient]);
 
-  return children;
+  return (
+    <>
+      {children}
+      <Toaster />
+    </>
+  );
 }

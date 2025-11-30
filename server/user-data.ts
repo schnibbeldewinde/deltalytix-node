@@ -53,7 +53,7 @@ export async function loadSharedData(slug: string): Promise<SharedDataResponse> 
 } 
 
 
-export async function getUserData(forceRefresh: boolean = false): Promise<{
+export async function getUserData(forceRefresh: boolean = false, userIdOverride?: string): Promise<{
   userData: User | null;
   subscription: Subscription | null;
   tickDetails: TickDetails[];
@@ -63,7 +63,15 @@ export async function getUserData(forceRefresh: boolean = false): Promise<{
   financialEvents: FinancialEvent[];
   moodHistory: Mood[];
 }> {
-  const userId = await getUserId()
+  let userId = userIdOverride
+  if (!userId) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user?.id) {
+      throw new Error('User not authenticated')
+    }
+    userId = user.id
+  }
   const locale = await getCurrentLocale()
 
   // If forceRefresh is true, bypass cache and fetch directly

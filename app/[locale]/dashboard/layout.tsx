@@ -3,7 +3,6 @@ import { DataProvider } from "@/context/data-provider";
 import Modals from "@/components/modals";
 import Navbar from "./components/navbar";
 import { RithmicSyncContextProvider } from "@/context/rithmic-sync-context";
-import { RithmicSyncNotifications } from './components/import/rithmic/sync/rithmic-notifications'
 import { TradovateSyncContextProvider } from "@/context/tradovate-sync-context";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -19,7 +18,6 @@ export default async function RootLayout({
         <DataProvider>
             <RithmicSyncContextProvider>
               <TradovateSyncContextProvider>
-                <RithmicSyncNotifications />
                 <div className="min-h-screen flex flex-col">
                       <Toaster />
                       <Navbar />

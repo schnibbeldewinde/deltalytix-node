@@ -35,14 +35,95 @@ export default function FileUpload({
   const [parsedFiles, setParsedFiles] = useState<string[][][]>([])
   const t = useI18n()
 
-  const processFile = useCallback((file: File, index: number) => {
+  const processFile = useCallback(async (file: File, index: number) => {
+    const name = file.name.toLowerCase()
+    const isExcel = name.endsWith('.xlsx') || name.endsWith('.xls')
+    const isHtml = name.endsWith('.html') || name.endsWith('.htm')
+
+    // HTML (MT5 report) path: store full text in a single cell for downstream parser
+    if (isHtml) {
+      try {
+        const text: string = await new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = (e) => resolve(e.target?.result as string)
+          reader.onerror = () => reject(new Error('Error reading HTML file'))
+          reader.readAsText(file)
+        })
+        setParsedFiles(prev => {
+          const next = [...prev]
+          next[index] = [[text]]
+          return next
+        })
+        setError(null)
+        setUploadProgress(prev => ({ ...prev, [file.name]: 100 }))
+        return
+      } catch (err: any) {
+        console.error('[FileUpload] HTML parse failed:', err)
+        setError(err?.message || 'Failed to read HTML file')
+        setUploadProgress(prev => ({ ...prev, [file.name]: 0 }))
+        throw err
+      }
+    }
+
+    // Excel parsing path (for MT5 exports)
+    if (isExcel) {
+      try {
+        const arrayBuffer: ArrayBuffer = await new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = (e) => resolve(e.target?.result as ArrayBuffer)
+          reader.onerror = () => reject(new Error('Error reading Excel file'))
+          reader.readAsArrayBuffer(file)
+        })
+
+        const excelModule = await import('exceljs')
+        const Workbook = (excelModule as any).Workbook || (excelModule as any).default?.Workbook
+        if (!Workbook) {
+          throw new Error('Failed to load Excel parser')
+        }
+        const workbook = new Workbook()
+        await workbook.xlsx.load(arrayBuffer)
+        const worksheet = workbook.worksheets[0]
+        const rows: string[][] = []
+        worksheet.eachRow((row: any) => {
+          const vals = row.values
+          // row.values is 1-indexed; drop index 0
+          const clean = (Array.isArray(vals) ? vals.slice(1) : []).map(v => (v ?? '').toString().trim())
+          // keep rows that have any non-empty cell
+          if (clean.some(c => c !== '')) {
+            rows.push(clean)
+          }
+        })
+
+        if (rows.length === 0) throw new Error('The Excel file appears to be empty or invalid.')
+
+        setParsedFiles(prev => {
+          const next = [...prev]
+          next[index] = rows
+          return next
+        })
+        setError(null)
+        // mark upload as complete for Excel path
+        setUploadProgress(prev => ({ ...prev, [file.name]: 100 }))
+        return
+      } catch (err: any) {
+        console.error('[FileUpload] Excel parse failed:', err)
+        setError(err?.message || 'Failed to parse Excel file')
+        setUploadProgress(prev => ({ ...prev, [file.name]: 0 }))
+        throw err
+      }
+    }
+
+    // CSV path (default)
     return new Promise<void>((resolve, reject) => {
-      // First read the first line to detect delimiter
-      const reader = new FileReader();
+      const reader = new FileReader()
       reader.onload = (e) => {
-        const firstLine = e.target?.result?.toString().split('\n')[0] || '';
-        const delimiter = firstLine.includes(';') ? ';' : ',';
-        
+        const firstLine = e.target?.result?.toString().split('\n')[0] || ''
+        const delimiter = firstLine.includes('\t')
+          ? '\t'
+          : firstLine.includes(';')
+            ? ';'
+            : ','
+
         Papa.parse(file, {
           delimiter,
           complete: (result) => {
@@ -53,6 +134,7 @@ export default function FileUpload({
                 return newFiles
               })
               setError(null)
+              setUploadProgress(prev => ({ ...prev, [file.name]: 100 }))
               resolve()
             } else {
               reject(new Error("The CSV file appears to be empty or invalid."))
@@ -62,11 +144,11 @@ export default function FileUpload({
             reject(new Error(`Error parsing CSV: ${error.message}`))
           }
         })
-      };
+      }
       reader.onerror = () => {
         reject(new Error("Error reading file"))
-      };
-      reader.readAsText(file);
+      }
+      reader.readAsText(file)
     })
   }, [setError])
 
@@ -117,6 +199,9 @@ export default function FileUpload({
 
       parsedFiles.forEach((file, index) => {
         const { headers: fileHeaders, processedData } = platform.processFile!(file)
+        if (!processedData || processedData.length === 0) {
+          throw new Error("No rows parsed from file.")
+        }
         if (index === 0) {
           headers = fileHeaders
           concatenatedData = processedData
@@ -138,6 +223,7 @@ export default function FileUpload({
       
       setError(null)
     } catch (error) {
+      console.error('[FileUpload] Processing failed:', error)
       setError((error as Error).message)
     }
   }, [importType, parsedFiles, setRawCsvData, setCsvData, setHeaders, setStep, setError])

@@ -26,7 +26,7 @@ export function useKeyboardShortcuts() {
     // Support shortcut
     hotkeys('⌘+h, ctrl+h', (event) => {
       event.preventDefault();
-      router.push('/support');
+      // support route removed
     });
 
     // Keyboard shortcuts dialog

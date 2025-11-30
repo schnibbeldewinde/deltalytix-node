@@ -14,7 +14,6 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { useI18n } from "@/locales/client"
 import { platforms, PlatformConfig, PlatformType } from './config/platforms'
 import { PlatformItem } from './components/platform-item'
-import { PlatformTutorial } from './components/platform-tutorial'
 import { cn } from '@/lib/utils'
 import { useImportTypePreferenceStore } from '@/store/import-type-preference-store'
 
@@ -75,7 +74,7 @@ export default function ImportTypeSelection({ selectedType, setSelectedType, set
 
   return (
     <div className="flex flex-col h-full">
-      <div className="grid md:grid-cols-2 gap-6 h-full min-h-0 p-2">
+      <div className="grid grid-cols-1 gap-6 h-full min-h-0 p-2">
         <div className="h-full min-h-0">
           <Command className="border rounded-lg h-full">
             <div className="flex flex-col h-full">
@@ -125,21 +124,7 @@ export default function ImportTypeSelection({ selectedType, setSelectedType, set
           </Command>
         </div>
 
-        <div className="h-full min-h-0 overflow-y-auto">
-          {/* <ScrollArea className="h-full"> */}
-            {selectedType !== '' && selectedPlatform && (
-              selectedPlatform.customComponent ? (
-                <div className="h-full pr-4">
-                  {selectedPlatform.customComponent && <selectedPlatform.customComponent setIsOpen={setIsOpen} />}
-                </div>
-              ) : (
-                <div className="pr-4">
-                  <PlatformTutorial selectedPlatform={selectedPlatform} setIsOpen={setIsOpen} />
-                </div>
-              )
-            )}
-          {/* </ScrollArea> */}
-        </div>
+        {/* Right side tutorial removed */}
       </div>
     </div>
   )

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Globe, LayoutDashboard, ChevronDown } from "lucide-react"
+import { ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Logo } from '@/components/logo'
 import Link from 'next/link'
@@ -20,14 +20,12 @@ import { UsersIcon, type UsersIconHandle } from '@/components/animated-icons/use
 import { useModalStateStore } from '@/store/modal-state-store'
 import { useUserStore } from '@/store/user-store'
 import UserMenu from './user-menu'
-import ReferralButton from './referral-button'
 
 export default function Navbar() {
   const  user = useUserStore(state => state.supabaseUser)
   const t = useI18n()
   const [shortcutsDialogOpen, setShortcutsDialogOpen] = useState(false)
   const [showAccountNumbers, setShowAccountNumbers] = useState(true)
-  const [isLogoPopoverOpen, setIsLogoPopoverOpen] = useState(false)
   const usersIconRef = useRef<UsersIconHandle>(null)
   const { accountGroupBoardOpen } = useModalStateStore()
 
@@ -39,55 +37,9 @@ export default function Navbar() {
       <nav className="fixed py-2 top-0 left-0 right-0 z-50 flex flex-col text-primary bg-background/80 backdrop-blur-md border-b shadow-xs w-screen">
         <div className="flex items-center justify-between px-10 h-16">
           <div className="flex items-center gap-x-4">
-            <div className="flex flex-col items-center">
-              <Popover open={isLogoPopoverOpen} onOpenChange={setIsLogoPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-9 px-2 rounded-md hover:bg-accent hover:text-accent-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-colors"
-                    aria-haspopup="menu"
-                    aria-expanded={isLogoPopoverOpen}
-                    aria-label={t('landing.navbar.logo.title')}
-                  >
-                    <span className="flex items-center gap-1">
-                      <Logo className='fill-black h-6 w-6 dark:fill-white' />
-                      <ChevronDown 
-                        className={`h-4 w-4 transition-transform duration-200 ${isLogoPopoverOpen ? 'rotate-180' : 'rotate-0'}`}
-                        aria-hidden="true"
-                      />
-                    </span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-64" align="start">
-                  <div className="space-y-2">
-                    <h4 className="font-medium leading-none mb-3">{t('landing.navbar.logo.title')}</h4>
-                    <div className="grid gap-2">
-                      <Link 
-                        href="/dashboard" 
-                        className="flex items-center gap-2 text-sm hover:bg-accent hover:text-accent-foreground p-2 rounded-md transition-colors"
-                        onClick={() => setIsLogoPopoverOpen(false)}
-                      >
-                        <div className="shrink-0 w-4 h-4">
-                          <LayoutDashboard className="h-full w-full" />
-                        </div>
-                        {t('landing.navbar.logo.dashboard')}
-                      </Link>
-                      <Link 
-                        href="/" 
-                        className="flex items-center gap-2 text-sm hover:bg-accent hover:text-accent-foreground p-2 rounded-md transition-colors"
-                        onClick={() => setIsLogoPopoverOpen(false)}
-                      >
-                        <div className="shrink-0 w-4 h-4">
-                          <Globe className="h-full w-full" />
-                        </div>
-                        {t('landing.navbar.logo.home')}
-                      </Link>
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
+            <Link href="/dashboard" className="flex items-center gap-1 px-2">
+              <Logo className='fill-black h-6 w-6 dark:fill-white' />
+            </Link>
             <div className="hidden md:block">
               <FilterCommandMenu variant="navbar" />
             </div>
@@ -97,7 +49,6 @@ export default function Navbar() {
               <ImportButton />
             </div>
             <div className="flex items-center gap-2">
-              <ReferralButton />
               <UserMenu />
             </div>
           </div>

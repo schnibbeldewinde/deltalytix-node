@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
-import { openai } from "@ai-sdk/openai"
+import { createOpenAI } from "@ai-sdk/openai"
 import { generateObject } from "ai"
 import { z } from "zod"
+import { resolveOpenAIKey } from '@/app/api/ai/utils/resolve-openai-key'
 
 const prisma = new PrismaClient()
 
@@ -73,7 +74,13 @@ export async function POST(req: NextRequest) {
     // Prepare emails for AI processing
     const emails = subscribers.map(sub => sub.email)
 
+    const apiKey = await resolveOpenAIKey()
+    if (!apiKey) {
+      return NextResponse.json({ success: false, error: 'OpenAI API key is missing. Bitte in den Settings speichern.' }, { status: 400 })
+    }
+
     // Use AI to infer names from emails
+    const openai = createOpenAI({ apiKey })
     const { object } = await generateObject({
       model: openai("gpt-4o-mini-2024-07-18"),
       schema: nameInferenceSchema,

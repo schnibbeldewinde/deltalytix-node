@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { User, Subscription, Tag, DashboardLayout } from "@prisma/client";
 import { Prisma } from "@prisma/client";
-import { User as SupabaseUser } from "@supabase/supabase-js";
+import { AuthUser } from "@/types/auth";
 import { Group, Account } from "@/context/data-provider";
 import { Widget } from "@/app/[locale]/dashboard/types/dashboard";
 import {
@@ -32,7 +32,7 @@ export type DashboardLayoutWithWidgets = {
 
 type UserStore = {
   user: User | null;
-  supabaseUser: SupabaseUser | null;
+  supabaseUser: AuthUser | null;
   subscription: SubscriptionData;
   tags: Tag[];
   accounts: Account[];
@@ -44,7 +44,7 @@ type UserStore = {
   timezone: string;
   setTimezone: (timezone: string) => void;
   setUser: (user: User | null) => void;
-  setSupabaseUser: (supabaseUser: SupabaseUser | null) => void;
+  setSupabaseUser: (supabaseUser: AuthUser | null) => void;
   setSubscription: (subscription: Subscription | null) => void;
   setTags: (tags: Tag[]) => void;
   addTag: (tag: Tag) => void;

@@ -18,7 +18,7 @@ interface StripeSubscriptionStore {
 export const useStripeSubscriptionStore = create<StripeSubscriptionStore>()((set, get) => ({
   // Initial state
   stripeSubscription: null,
-  isLoading: true,
+  isLoading: false,
   error: null,
   
   // Actions
@@ -37,21 +37,6 @@ export const useStripeSubscriptionStore = create<StripeSubscriptionStore>()((set
   }),
   
   refreshSubscription: async () => {
-    try {
-      set({ isLoading: true, error: null });
-      const { getSubscriptionData } = await import('@/app/[locale]/dashboard/actions/billing');
-      const subscriptionData = await getSubscriptionData();
-      set({ 
-        stripeSubscription: subscriptionData,
-        error: null 
-      });
-    } catch (error) {
-      set({ 
-        error: error instanceof Error ? error.message : 'Failed to refresh subscription',
-        stripeSubscription: null 
-      });
-    } finally {
-      set({ isLoading: false });
-    }
+    set({ stripeSubscription: null, isLoading: false, error: null })
   }
 }))

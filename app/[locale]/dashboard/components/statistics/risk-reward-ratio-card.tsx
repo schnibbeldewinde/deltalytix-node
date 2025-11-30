@@ -2,7 +2,6 @@
 
 import { useData } from "@/context/data-provider"
 import { Card } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
 import {
   Tooltip,
   TooltipContent,
@@ -50,12 +49,16 @@ export default function RiskRewardRatioCard({ size = 'tiny' }: RiskRewardRatioCa
     return { avgWin, avgLoss, riskRewardRatio, profitPercentage }
   }, [formattedTrades])
 
+  const barColor =
+    riskRewardRatio < 1 ? "bg-red-500" : riskRewardRatio < 3 ? "bg-amber-400" : "bg-emerald-400"
+  const pct = Math.max(0, Math.min(100, profitPercentage))
+
   return (
     <Card className="h-full">
       <div className="flex flex-col items-center justify-center h-full gap-2 p-2">
         <div className="flex items-center gap-1.5">
           <Scale className="h-3 w-3 text-primary" />
-          <span className="font-medium text-sm">RR {riskRewardRatio}</span>
+          <span className="font-semibold text-lg leading-none">RR {riskRewardRatio}</span>
           <TooltipProvider delayDuration={100}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -75,7 +78,12 @@ export default function RiskRewardRatioCard({ size = 'tiny' }: RiskRewardRatioCa
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="w-full px-1 py-1.5 cursor-pointer">
-                <Progress value={profitPercentage} className="h-1.5" />
+                <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={`h-full ${barColor}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
               </div>
             </TooltipTrigger>
             <TooltipContent side="top" sideOffset={5}>

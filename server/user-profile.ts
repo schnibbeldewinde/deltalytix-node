@@ -1,12 +1,12 @@
 'use server'
 
-import { createClient } from './auth'
 import { prisma } from '@/lib/prisma'
-import type { User } from '@supabase/supabase-js'
 import type { Subscription } from '@prisma/client'
+import { getSession } from './auth'
+import { AuthUser } from '@/types/auth'
 
 export type UserProfileData = {
-  supabaseUser: User | null
+  supabaseUser: AuthUser | null
   subscription: Subscription | null
 }
 
@@ -18,10 +18,9 @@ export type UserProfileData = {
  * Next.js will automatically handle request memoization during a single render.
  */
 export async function getUserProfileAction(): Promise<UserProfileData> {
-  const supabase = await createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
+  const session = await getSession()
 
-  if (error || !user) {
+  if (!session?.user) {
     return {
       supabaseUser: null,
       subscription: null
@@ -30,11 +29,11 @@ export async function getUserProfileAction(): Promise<UserProfileData> {
 
   // Fetch subscription data if user exists
   const subscription = await prisma.subscription.findUnique({
-    where: { userId: user.id }
+    where: { userId: session.user.id }
   })
 
   return {
-    supabaseUser: user,
+    supabaseUser: session.user,
     subscription
   }
 }

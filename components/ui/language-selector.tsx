@@ -38,11 +38,9 @@ export function LanguageSelector({
 }: LanguageSelectorProps) {
   const [open, setOpen] = React.useState(false)
   const currentLocale = useCurrentLocale()
-  const changeLocale = useChangeLocale()
   const t = useI18n()
 
   const handleLanguageChange = (locale: string) => {
-    changeLocale(locale as "en" | "fr")
     setOpen(false)
   }
 

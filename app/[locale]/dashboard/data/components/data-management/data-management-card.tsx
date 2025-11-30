@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
-import { TrashIcon, AlertCircle, ChevronDown, ChevronUp, MoreVertical, Edit2, Loader2 } from "lucide-react"
+import { TrashIcon, AlertCircle, ChevronDown, ChevronUp, MoreVertical, Edit2, Loader2, Download, Upload } from "lucide-react"
 import { 
   removeAccountsFromTradesAction, 
   deleteInstrumentGroupAction, 
@@ -14,7 +14,6 @@ import {
 } from "@/server/accounts"
 import { useData } from '@/context/data-provider'
 import { toast } from 'sonner'
-import { User } from '@supabase/supabase-js'
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -23,6 +22,7 @@ import { Label } from "@/components/ui/label"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Trade } from '@prisma/client'
 import ExportButton from '@/components/export-button'
+import { backupDatabaseAction, restoreDatabaseAction, removeDuplicateTradesAction } from '@/server/database'
 import { useI18n } from "@/locales/client"
 import { useUserStore } from '@/store/user-store'
 import { useTradesStore } from '@/store/trades-store'
@@ -39,6 +39,10 @@ export function DataManagementCard() {
   const { refreshTrades } = useData()
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [renameLoading, setRenameLoading] = useState(false)
+  const [dedupeLoading, setDedupeLoading] = useState(false)
+  const [backupLoading, setBackupLoading] = useState(false)
+  const [restoreLoading, setRestoreLoading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [error, setError] = useState<Error | null>(null)
   const [expandedAccounts, setExpandedAccounts] = useState<Record<string, boolean>>({})
   const [renameInstrumentDialogOpen, setRenameInstrumentDialogOpen] = useState(false)
@@ -241,6 +245,92 @@ export function DataManagementCard() {
           <span className="text-xl md:text-2xl">{t('dataManagement.title')}</span>
           <div className="flex flex-wrap gap-2 w-full md:w-auto">
             <ExportButton trades={trades} />
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 md:flex-none"
+              onClick={async () => {
+                try {
+                  setDedupeLoading(true)
+                  const res = await fetch('/api/dedupe', { method: 'POST' }).then(r => r.json())
+                  await refreshTrades()
+                  toast.success(`${res.removed || 0} duplicates removed`)
+                } catch (error) {
+                  toast.error('Duplicate removal failed')
+                } finally {
+                  setDedupeLoading(false)
+                }
+              }}
+              disabled={dedupeLoading}
+            >
+              {dedupeLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TrashIcon className="mr-2 h-4 w-4" />}
+              Remove duplicates
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 md:flex-none"
+              onClick={async () => {
+                try {
+                  setBackupLoading(true)
+                  const res = await fetch('/api/backup')
+                  const { snapshot } = await res.json()
+                  const url = URL.createObjectURL(new Blob([snapshot], { type: 'application/json' }))
+                  const link = document.createElement('a')
+                  link.href = url
+                  link.download = `backup_${new Date().toISOString()}.json`
+                  document.body.appendChild(link)
+                  link.click()
+                  document.body.removeChild(link)
+                  URL.revokeObjectURL(url)
+                  toast.success('Backup erstellt')
+                } catch (error) {
+                  toast.error('Backup fehlgeschlagen')
+                } finally {
+                  setBackupLoading(false)
+                }
+              }}
+              disabled={backupLoading}
+            >
+              {backupLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+              Backup
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 md:flex-none"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={restoreLoading}
+            >
+              {restoreLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+              Restore
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                try {
+                  setRestoreLoading(true)
+                  const text = await file.text()
+                  const res = await fetch('/api/backup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ snapshot: text })
+                  }).then(r => r.json())
+                  await refreshTrades()
+                  toast.success(`Wiederhergestellt: ${res.restoredTrades || 0} Trades`)
+                } catch (err) {
+                  toast.error('Restore fehlgeschlagen')
+                } finally {
+                  setRestoreLoading(false)
+                  if (fileInputRef.current) fileInputRef.current.value = ''
+                }
+              }}
+            />
             <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
               <AlertDialogTrigger asChild>
                 <Button

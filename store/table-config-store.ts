@@ -51,15 +51,15 @@ const defaultTradeTableConfig: TableConfig = {
     { id: 'closePrice', title: 'Exit Price', visible: true, size: 100, order: 7 },
     { id: 'timeInPosition', title: 'Position Time', visible: true, size: 120, order: 8 },
     { id: 'entryTime', title: 'Entry Time', visible: true, size: 100, order: 9 },
-    { id: 'closeDate', title: 'Exit Time', visible: true, size: 100, order: 10 },
-    { id: 'pnl', title: 'PnL', visible: true, size: 100, order: 11 },
-    { id: 'commission', title: 'Commission', visible: true, size: 100, order: 12 },
-    { id: 'quantity', title: 'Quantity', visible: true, size: 100, order: 13 },
-    { id: 'ticksAndPoints', title: 'Ticks/Points', visible: true, size: 100, order: 14 },
-    { id: 'image', title: 'Image', visible: true, size: 80, order: 15 },
-    { id: 'tags', title: 'Tags', visible: true, size: 200, order: 16 },
-    { id: 'comment', title: 'Comment', visible: true, size: 200, order: 17 },
-    { id: 'videoUrl', title: 'Video URL', visible: true, size: 200, order: 18 },
+    { id: 'closeDateOnly', title: 'Exit Date', visible: true, size: 100, order: 10 },
+    { id: 'closeDate', title: 'Exit Time', visible: true, size: 100, order: 11 },
+    { id: 'pnl', title: 'PnL', visible: true, size: 100, order: 12 },
+    { id: 'commission', title: 'Commission', visible: true, size: 100, order: 13 },
+    { id: 'quantity', title: 'Quantity', visible: true, size: 100, order: 14 },
+    { id: 'ticksAndPoints', title: 'Ticks/Points', visible: true, size: 100, order: 15 },
+    { id: 'image', title: 'Image', visible: true, size: 80, order: 16 },
+    { id: 'tags', title: 'Tags', visible: true, size: 200, order: 17 },
+    { id: 'comment', title: 'Comment', visible: true, size: 200, order: 18 },
   ],
   columnVisibility: {},
   sorting: [{ id: 'entryDate', desc: true }],
@@ -76,16 +76,61 @@ export const useTableConfigStore = create<TableConfigState>()(
       },
 
       // Migration function to handle old column references
-      migrateOldColumns: () => {
-        const state = get()
-        const tradeTable = state.tables['trade-table']
-        
-        if (tradeTable) {
-          // Check if old columns exist and migrate them
-          const hasOldTicks = tradeTable.columns.some(col => col.id === 'ticks')
-          const hasOldPoints = tradeTable.columns.some(col => col.id === 'points')
-          
-          if (hasOldTicks || hasOldPoints) {
+  migrateOldColumns: () => {
+    const state = get()
+    const tradeTable = state.tables['trade-table']
+    
+    if (tradeTable) {
+      let updatedColumns = [...tradeTable.columns]
+      let updatedVisibility = { ...tradeTable.columnVisibility }
+      let updatedSorting = [...tradeTable.sorting]
+
+      // Remove legacy videoUrl column
+      if (updatedColumns.some(col => col.id === 'videoUrl')) {
+        updatedColumns = updatedColumns.filter(col => col.id !== 'videoUrl')
+        delete updatedVisibility['videoUrl']
+        updatedSorting = updatedSorting.filter(sort => sort.id !== 'videoUrl')
+      }
+
+      // Ensure Exit Date column exists and sits after Entry Date
+      const hasExitDate = updatedColumns.some(col => col.id === 'closeDateOnly')
+      if (!hasExitDate) {
+        const entryDateCol = updatedColumns.find(col => col.id === 'entryDate')
+        const order = entryDateCol ? entryDateCol.order + 1 : 4
+        updatedColumns.push({
+          id: 'closeDateOnly',
+          title: 'Exit Date',
+          visible: true,
+          size: 100,
+          order,
+        })
+      }
+
+      // Re-sort orders to be sequential
+      updatedColumns = updatedColumns
+        .sort((a, b) => a.order - b.order)
+        .map((col, idx) => ({ ...col, order: idx }))
+
+      set({
+        tables: {
+          ...state.tables,
+          'trade-table': {
+            ...tradeTable,
+            columns: updatedColumns,
+            columnVisibility: updatedVisibility,
+            sorting: updatedSorting,
+          }
+        }
+      })
+    }
+
+    const tradeTableAfter = get().tables['trade-table']
+    if (tradeTableAfter) {
+      // Check if old columns exist and migrate them
+      const hasOldTicks = tradeTable.columns.some(col => col.id === 'ticks')
+      const hasOldPoints = tradeTable.columns.some(col => col.id === 'points')
+      
+      if (hasOldTicks || hasOldPoints) {
             // Remove old columns and add the new combined column
             const updatedColumns = tradeTable.columns
               .filter(col => col.id !== 'ticks' && col.id !== 'points')
@@ -136,9 +181,9 @@ export const useTableConfigStore = create<TableConfigState>()(
                 },
               },
             })
-          }
-        }
-      },
+      }
+    }
+  },
 
       setTableConfig: (tableId, config) => set((state) => ({
         tables: {

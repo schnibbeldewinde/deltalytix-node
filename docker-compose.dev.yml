@@ -1,0 +1,54 @@
+version: "3.9"
+
+services:
+  mongo:
+    image: mongo:7
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.runCommand({ ping: 1 })"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  mongo-init-replica:
+    image: mongo:7
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      MONGO_REPLICA_HOST: "mongo:27017"
+    volumes:
+      - ./docker/mongo-init.js:/docker/mongo-init.js:ro
+    entrypoint: ["bash", "-c", "mongosh --host mongo --file /docker/mongo-init.js || true"]
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["npm", "run", "dev"]
+    depends_on:
+      mongo:
+        condition: service_healthy
+      mongo-init-replica:
+        condition: service_completed_successfully
+    ports:
+      - "3000:3000"
+    environment:
+      MONGODB_URI: "mongodb://mongo:27017/deltalytix?replicaSet=rs0"
+      NEXT_PUBLIC_BUILD_NUMBER: "dev"
+      NEXT_PUBLIC_BUILD_DATE: ""
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      - /app/node_modules
+    restart: unless-stopped
+
+volumes:
+  mongo-data:
