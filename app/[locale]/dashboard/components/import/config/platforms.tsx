@@ -693,6 +693,247 @@ const processMt5 = (data: string[][]): ProcessedData => {
   return { headers, processedData }
 }
 
+// Interactive Brokers HTML statement (Transaktionen table)
+const processIbkrHtml = (data: string[][]): ProcessedData => {
+  if (!data.length || !data[0] || !data[0][0]) {
+    throw new Error('The IBKR HTML file appears to be empty.')
+  }
+
+  const raw = data.flat().join('\n').replace(/\u0000/g, '')
+  const headers = [
+    'instrument',
+    'entryDate',
+    'closeDate',
+    'quantity',
+    'entryPrice',
+    'closePrice',
+    'pnl',
+    'commission',
+    'side',
+    'currency',
+    'code',
+    'proceeds',
+    'basis',
+    'mtmPnL',
+    'comment',
+  ]
+
+  const decode = (s: string) =>
+    s
+      .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+  const strip = (s: string) => decode(s.replace(/<[^>]+>/g, '')).trim()
+
+  const codeMap: Record<string, string> = {
+    A: 'Zuordnung',
+    ADR: 'Aufgelaufene ADR-Gebühren',
+    AEx: 'Automatische Ausübung für Dividenden-bezogene Empfehlung',
+    AFx: 'AutoFX conversion resulting from trading',
+    Adj: 'Anpassung',
+    Al: 'Zuteilung',
+    AI: 'Externe Transaktion',
+    B: 'Automatische Zwangseindeckung',
+    Bo: 'Direktleihe',
+    C: 'Schlusstransaktion',
+    CR: 'Barzuteilung',
+    CP: 'Komplexe Position',
+    CS: 'Storniert',
+    Co: 'Korrigierte Transaktion',
+    Cx: 'Cross-Trade mit IB als Doppel-Intermediär',
+    DT: 'Discounted Trade',
+    De: 'Delivery or Conversion Action',
+    ETF: 'ETF - Creation/Redemption',
+    Ep: 'Resultierte aus einer abgelaufenen Position',
+    EX: 'Ausübung',
+    FA: 'Auf Hedgefonds übertragene Anlage',
+    FP: 'Fractional portion executed gegen IB/affiliate',
+    FPA: 'Fractional + whole executed; IB acted as agent',
+    G: 'Handel in garantiertem Kontosegment',
+    GEA: 'Exercise/Assignment from offsetting positions',
+    HC: 'Auswahl der höchsten Steuerbasis für Kosten',
+    HF1: 'Auf Hedgefonds übertragene Anlage',
+    HFR: 'Rücknahme aus dem Hedgefonds',
+    I: 'Internet Transfer',
+    IA: 'Trade executed against IB/affiliate',
+    IM: 'Teil der Order gegen IB/affiliate; IB als Agent',
+    INV: 'Anlagentransfer vom Anleger',
+    IPO: 'IPO-Ausführung, IB als Principal',
+    LD: 'Von IB angefordert (Margenschutz) / Wash-Sale-Anpassung',
+    LFI: 'Liquidation of fractional position by IB',
+    LI: 'Steuerauswahl: LIFO',
+    LT: 'Langfristiger G/V',
+    Lo: 'Direktes Darlehen',
+    ME: 'Manuell von IB eingegeben',
+    MEX: 'Manuelle Ausübung Dividenden-bezogene Empfehlung',
+    ML: 'Steuerbasiswahl zur Maximierung von Verlusten',
+    MLG: 'Steuerbasiswahl zur Maximierung langfristiger Gewinne',
+    MS: 'Steuerbasiswahl zur Maximierung von Verlusten',
+    MSG: 'Steuerbasiswahl zur Maximierung kurzfristiger Gewinne',
+    MSL: 'Steuerbasiswahl zur Maximierung kurzfristiger Verluste',
+    O: 'Eröffnungstransaktion',
+    OS: 'Yes/No contracts offset to $1.00 cash settlement',
+    OP: 'Teilausführung',
+    PE: 'Perpetual Investment',
+    PI: 'Kursverbesserung',
+    PTA: 'Post Trade Allocation',
+    Po: 'Vorbezug aufgelaufener Zinsen oder Dividenden',
+    Pr: 'Börsen-Crosstrade, IB als Principal',
+    R: 'Dividenden-Wiederanlage',
+    RED: 'Rückzahlung an Anleger',
+    RI: 'Sparplan',
+    RP: 'Fractional Teil als riskless principal durch Affiliate',
+    RPA: 'Fractional + Whole: Agent; Fractional riskless principal Affiliate',
+    Rb: 'Rebill',
+    Re: 'Umwandlung aufgelaufener Zinsen oder Dividenden',
+    Ri: 'Rückerstattung',
+    S1: 'Contract settled to zero value',
+    S2: 'Contract settled to $1.00',
+    SI: 'IBKR Lite Surcharge Fee (Volumen >10%)',
+    SL: 'Order durch externen Interbroker vermittelt',
+    SO: 'Order durch einführenden Broker vermittelt',
+    SS: 'Neutrale Abwicklung / evtl. Ausführung über Marktpreis',
+    ST: 'Kurzfristiger G/V',
+    T: 'Transfer',
+    Un: 'Nicht investierte Aktien aus Bezugsrechten',
+    XCH: 'Mutual Fund Exchange Transaction',
+  }
+
+  const buildComment = (codeStr: string) => {
+    const codes = codeStr.split(/[;,\\s]+/).map(c => c.trim()).filter(Boolean)
+    if (!codes.length) return ''
+    const meanings = codes.map(c => codeMap[c] || `Code ${c}`)
+    return meanings.join(' | ')
+  }
+
+  const normalizeDateTime = (val: string) => {
+    const trimmed = val.trim().replace(/\./g, '-')
+    // Expected: 2025-10-07, 09:37:16 (or with spaces)
+    const match = trimmed.match(/^(\d{4}-\d{2}-\d{2})[, ]+\s*(\d{2}:\d{2}:\d{2})/)
+    if (!match) return trimmed
+    const [, d, t] = match
+    return `${d}T${t}Z`
+  }
+
+  let currentCurrency = ''
+  const processed: string[][] = []
+  const pushFromCells = (cells: string[]) => {
+    const [
+      symbol = '',
+      dateTime = '',
+      qty = '',
+      tradePrice = '',
+      closePrice = '',
+      proceeds = '',
+      commission = '',
+      basis = '',
+      realizedPnL = '',
+      mtmPnL = '',
+      code = '',
+    ] = cells
+
+    if (!symbol || !dateTime || !qty) return
+    const qtyNum = parseFloat(qty.replace(',', '.'))
+    const side = isNaN(qtyNum)
+      ? ''
+      : qtyNum < 0
+        ? 'short'
+        : 'long'
+    const isoTs = normalizeDateTime(dateTime)
+    const comment = buildComment(code)
+    processed.push([
+      symbol,
+      isoTs,
+      isoTs,
+      qty,
+      tradePrice,
+      closePrice,
+      realizedPnL,
+      commission,
+      side,
+      currentCurrency,
+      code,
+      proceeds,
+      basis,
+      mtmPnL,
+      comment,
+    ])
+  }
+
+  const tryParseTbodies = (htmlBlock: string) => {
+    const tbodyRegex = /<tbody[^>]*>([\s\S]*?)<\/tbody>/gi
+    let tbodyMatch: RegExpExecArray | null
+    while ((tbodyMatch = tbodyRegex.exec(htmlBlock)) !== null) {
+      const tbody = tbodyMatch[1]
+      const firstTdMatch = tbody.match(/<td[^>]*class=["']([^"']*)["'][^>]*>([\s\S]*?)<\/td>/i)
+      const firstClass = firstTdMatch?.[1] || ''
+      const firstText = strip(firstTdMatch?.[2] || '')
+
+      if (firstClass.includes('header-currency')) {
+        currentCurrency = firstText
+        continue
+      }
+      if (firstClass.includes('header-asset')) {
+        continue
+      }
+      if (/class=["']?subtotal/i.test(tbody)) {
+        continue
+      }
+
+      const cells = [...tbody.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(m => strip(m[1]))
+      if (cells.length !== 11) continue
+
+      pushFromCells(cells)
+    }
+  }
+
+  // 1) Preferred: transactions section (tblTransactions_*Body)
+  const sectionMatch = raw.match(/id=["']tblTransactions_[^"']*Body["'][^>]*>([\s\S]*?)<\/div>/i)
+  if (sectionMatch) {
+    const sectionHtml = sectionMatch[1]
+    const tableMatch = sectionHtml.match(/<table[^>]*>([\s\S]*?)<\/table>/i)
+    if (tableMatch) {
+      tryParseTbodies(tableMatch[1])
+    }
+  }
+
+  // 2) Fallback: summaryDetailTable
+  if (!processed.length) {
+    const tableMatch = raw.match(/<table[^>]*id=["']summaryDetailTable["'][^>]*>([\s\S]*?)<\/table>/i)
+    if (tableMatch) {
+      tryParseTbodies(tableMatch[1])
+    }
+  }
+
+  // 3) Fallback: any tbody in the whole document
+  if (!processed.length) {
+    tryParseTbodies(raw)
+  }
+
+  // Final fallback: scan any <tr> with >=9 <td> cells inside the transactions section
+  if (!processed.length && sectionMatch) {
+    const sectionHtml = sectionMatch[1]
+    const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi
+    let rowMatch: RegExpExecArray | null
+    while ((rowMatch = rowRegex.exec(sectionHtml)) !== null) {
+      const rowHtml = rowMatch[1]
+      if (/header-currency|header-asset|subtotal/i.test(rowHtml)) continue
+      const cells = [...rowHtml.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(m => strip(m[1]))
+      if (cells.length < 9) continue
+      // Pad to 11 if shorter
+      while (cells.length < 11) cells.push('')
+      pushFromCells(cells.slice(0, 11))
+    }
+  }
+
+  if (!processed.length) {
+    throw new Error('No trades were parsed from the IBKR HTML Transaktionen table.')
+  }
+
+  return { headers, processedData: processed }
+}
+
 export const platforms: PlatformConfig[] = [
   {
     platformName: 'rithmic-sync',
@@ -1228,7 +1469,7 @@ export const platforms: PlatformConfig[] = [
   {
     platformName: 'ibkr-pdf-import',
     type: 'ibkr-pdf-import',
-    name: 'import.type.pdfImport.name',
+    name: 'Interactive Brokers',
     description: 'import.type.pdfImport.description',
     category: 'Intelligent Import',
     videoUrl: '',
@@ -1238,6 +1479,7 @@ export const platforms: PlatformConfig[] = [
       alt: 'IBKR Logo'
     },
     requiresAccountSelection: true,
+    disableAiFormatting: false,
     steps: [
       {
         id: 'select-import-type',
@@ -1263,6 +1505,43 @@ export const platforms: PlatformConfig[] = [
         description: 'import.steps.selectAccountDescription',
         component: AccountSelection
       },
+    ]
+  },
+  {
+    platformName: 'ibkr-html-import',
+    type: 'ibkr-html-import',
+    name: 'Interactive Brokers (HTML)',
+    description: 'Import IBKR HTML statement (Transaktionen table)',
+    details: '',
+    category: 'Intelligent Import',
+    logo: {
+      path: '/logos/ibkr.png',
+      alt: 'IBKR Logo'
+    },
+    requiresAccountSelection: true,
+    skipHeaderSelection: true,
+    disableAiFormatting: true,
+    processFile: processIbkrHtml,
+    steps: [
+      {
+        id: 'select-import-type',
+        title: 'import.steps.selectPlatform',
+        description: 'import.steps.selectPlatformDescription',
+        component: ImportTypeSelection
+      },
+      {
+        id: 'upload-file',
+        title: 'import.steps.uploadFile',
+        description: 'import.steps.uploadFileDescription',
+        component: FileUpload
+      },
+      {
+        id: 'preview-trades',
+        title: 'import.steps.processTrades',
+        description: 'import.steps.processTradesDescription',
+        component: FormatPreview,
+        isLastStep: true
+      }
     ]
   },
   {
