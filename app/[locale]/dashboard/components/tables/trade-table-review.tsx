@@ -437,31 +437,17 @@ export function TradeTableReview({ tradesParam }: { tradesParam?: Trade[] }) {
     const groups = new Map<string, ExtendedTrade>();
 
     trades.forEach((trade) => {
-      // Create a key that accounts for granularity
-      const entryDate = new Date(trade.entryDate);
-
-      // Round dates based on granularity
-      const roundDate = (date: Date) => {
-        if (groupingGranularity === 0) return date;
-        const roundedDate = new Date(date);
-        roundedDate.setSeconds(
-          Math.floor(date.getSeconds() / groupingGranularity) *
-            groupingGranularity,
-        );
-        roundedDate.setMilliseconds(0);
-        return roundedDate;
-      };
-
-      const roundedEntryDate = roundDate(entryDate);
+      // Use the original entryDate string to avoid any TZ/format shifts
+      const entryDateRaw = trade.entryDate || "";
 
       const key = trade.groupId
         ? `${trade.groupId}`
-        : `${trade.instrument}-${roundedEntryDate.toISOString()}`;
+        : `${trade.instrument}-${entryDateRaw}`;
 
       if (!groups.has(key)) {
         groups.set(key, {
           instrument: trade.instrument,
-          entryDate: roundedEntryDate.toISOString(),
+          entryDate: entryDateRaw,
           closeDate: trade.closeDate,
           tags: trade.tags,
           images: trade.images,
@@ -653,16 +639,15 @@ export function TradeTableReview({ tradesParam }: { tradesParam?: Trade[] }) {
             tableId="trade-table"
           />
         ),
-        cell: ({ row }) =>
-          formatInTimeZone(
-            new Date(row.original.entryDate),
-            timezone,
-            "yyyy-MM-dd",
-          ),
-        sortingFn: (rowA, rowB, columnId) => {
-          const a = new Date(rowA.getValue(columnId)).getTime();
-          const b = new Date(rowB.getValue(columnId)).getTime();
-          return a < b ? -1 : a > b ? 1 : 0;
+        cell: ({ row }) => {
+          const raw = row.original.entryDate || '';
+          const datePart = raw.split('T')[0] || raw;
+          return datePart;
+        },
+        sortingFn: (rowA, rowB) => {
+          const a = rowA.original.entryDate || '';
+          const b = rowB.original.entryDate || '';
+          return a.localeCompare(b);
         },
         size: 120,
       },

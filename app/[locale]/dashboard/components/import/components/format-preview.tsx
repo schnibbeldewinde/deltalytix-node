@@ -192,16 +192,8 @@ export function FormatPreview({
         } else if (h === 'entryPrice' || h === 'closePrice') {
           t[h] = val !== undefined && val !== null ? String(val) : '';
         } else if (h === 'entryDate' || h === 'closeDate') {
-          const raw = (val as string).replace(/\.\d+Z$/, 'Z')
-          const d = new Date(raw)
-          if (!isNaN(d.getTime())) {
-            const iso = d.toISOString()
-            const parts = iso.split('T')
-            const time = parts[1].replace(/\.\d{3}Z$/, 'Z')
-            t[h] = `${parts[0]}T${time}`
-          } else {
-            t[h] = raw
-          }
+          // Keep as-is to preserve local times (no TZ shift)
+          t[h] = val as string;
         } else if (h === 'side') {
           t[h] = (val as string).toLowerCase();
         } else {

@@ -291,9 +291,8 @@ const processSierra = (data: string[][]): ProcessedData => {
     const [datePart, timePartRaw] = [parts[0], parts[1]]
     const [timeMain, micro = '000'] = timePartRaw.split('.')
     const ms = (micro || '').slice(0, 3).padEnd(3, '0')
-    const iso = `${datePart}T${timeMain}.${ms}Z`
-    const d = new Date(iso)
-    return isNaN(d.getTime()) ? null : d.toISOString()
+    // Keep the original wall time as-is (no timezone adjustment) and mark as local
+    return `${datePart}T${timeMain}.${ms}`
   }
 
   const stateByKey: Record<string, {
@@ -336,6 +335,7 @@ const processSierra = (data: string[][]): ProcessedData => {
     CL: { tickSize: 0.01, tickValue: 10 },
     QM: { tickSize: 0.025, tickValue: 12.5 },
     MCL: { tickSize: 0.01, tickValue: 1 },
+    MCLE: { tickSize: 0.01, tickValue: 1 },
     NG: { tickSize: 0.001, tickValue: 10 },
     MNG: { tickSize: 0.001, tickValue: 1 },
     RB: { tickSize: 0.0001, tickValue: 4.2 },
@@ -401,7 +401,15 @@ const processSierra = (data: string[][]): ProcessedData => {
     return { tickSize: 0.25, tickValue: 1.25 }
   }
 
-  data.slice(1).forEach(row => {
+  // Ensure chronological processing to avoid mispairing fills
+  const sortedRows = data
+    .slice(1)
+    .map(row => ({ row, ts: parseDate(getVal(row, iDateTime)) || parseDate(getVal(row, iTransDateTime)) }))
+    .filter(item => !!item.ts)
+    .sort((a, b) => (a.ts! < b.ts! ? -1 : a.ts! > b.ts! ? 1 : 0))
+    .map(item => item.row)
+
+  sortedRows.forEach(row => {
     const activity = getVal(row, iActivityType).toLowerCase()
     if (activity && activity !== 'fills') return
 
@@ -459,10 +467,11 @@ const processSierra = (data: string[][]): ProcessedData => {
     } else {
       // Closing some/all
       let remaining = qty
+      const openSign = st.side === 'short' ? -1 : 1
       while (remaining > 0 && st.opens.length > 0) {
         const openFill = st.opens[0]
         const matchQty = Math.min(openFill.qty, remaining)
-        const priceDiff = fillPrice - openFill.price
+        const priceDiff = (fillPrice - openFill.price) * openSign
         const ticks = priceDiff / spec.tickSize
         st.pnl += ticks * spec.tickValue * matchQty
         st.closeValue += fillPrice * matchQty

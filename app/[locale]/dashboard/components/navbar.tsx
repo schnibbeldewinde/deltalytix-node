@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Logo } from '@/components/logo'
 import Link from 'next/link'
 import ImportButton from './import/import-button'
+import AddTradeButton from './import/add-trade-button'
 import { useI18n } from "@/locales/client"
 import { useKeyboardShortcuts } from '../hooks/use-keyboard-shortcuts'
 import { ActiveFilterTags } from './filters/active-filter-tags'
@@ -47,6 +48,7 @@ export default function Navbar() {
           <div className="flex items-center space-x-4">
             <div className='hidden md:flex gap-x-4'>
               <ImportButton />
+              <AddTradeButton />
             </div>
             <div className="flex items-center gap-2">
               <UserMenu />

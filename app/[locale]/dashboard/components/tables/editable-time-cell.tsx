@@ -35,8 +35,17 @@ export function EditableTimeCell({
   const [isSaving, setIsSaving] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const formattedTime = formatInTimeZone(new Date(value), timezone, 'HH:mm:ss')
-  const formattedDate = formatInTimeZone(new Date(value), timezone, 'yyyy-MM-dd')
+  const splitValue = (val: string) => {
+    const [d, t] = val.split('T')
+    const [timeMain] = (t || '').split(' ')
+    const cleanedTime = (timeMain || '').replace(/Z$/, '')
+    return { date: d || val, time: cleanedTime }
+  }
+  const formatLocal = (d: Date) => {
+    const pad = (n: number, s = 2) => n.toString().padStart(s, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`
+  }
+  const { date: formattedDate, time: formattedTime } = splitValue(value)
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -73,9 +82,9 @@ export function EditableTimeCell({
           throw new Error(t('trade-table.editableTimeCell.invalidTimeFormat'))
         }
 
-        const originalDate = new Date(value)
-        newDateTime = new Date(originalDate)
-        newDateTime.setHours(hours, minutes, seconds || 0)
+        const base = new Date(value)
+        newDateTime = new Date(base)
+        newDateTime.setHours(hours, minutes, seconds || 0, base.getMilliseconds())
       } else if (hourOffset !== 0) {
         // Apply hour offset
         newDateTime = new Date(value)
@@ -86,7 +95,7 @@ export function EditableTimeCell({
         return
       }
 
-      await onUpdate(tradeIds, { [fieldType]: newDateTime.toISOString() })
+      await onUpdate(tradeIds, { [fieldType]: formatLocal(newDateTime) })
       setIsEditing(false)
       setIsPopoverOpen(false)
     } catch (error) {
