@@ -129,11 +129,19 @@ If Compose did not inject them for you, set them manually in `.env` or via Compo
 - For AI features, ensure an OpenAI key is provided (env or Settings). If quota is exceeded, OpenAI will return `insufficient_quota` errors.
 - Delete Mongo-data
 ```bash
-docker compose down -v
+# Stop services only
+docker-compose stop
+
+# Stop and remove containers, networks..
+docker-compose down 
+
+# Down and remove volumes
+docker-compose down --volumes 
+
+# Down and remove images
+docker-compose down --rmi <all|local> 
 ```
-```bash
-docker compose down -v
-```
+
 
 ## License
 This project is provided for self-hosted use. Review included assets and third-party licenses as applicable.

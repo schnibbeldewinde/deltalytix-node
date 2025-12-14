@@ -164,7 +164,7 @@ const useHashUpload = (options: UseHashUploadOptions) => {
           const fileName = `${hashHex}.${ext}`
           const filePath = path ? `${path}/${fileName}` : fileName
 
-          const { error } = await supabase.storage
+          const { data: uploaded, error } = await supabase.storage
             .from(bucketName)
             .upload(filePath, file, {
               cacheControl: cacheControl.toString(),
@@ -188,15 +188,15 @@ const useHashUpload = (options: UseHashUploadOptions) => {
             return { name: file.name, message: error.message, url: undefined }
           }
 
-          // Get public URL for successful upload
-          const { data: pub } = supabase.storage
-            .from(bucketName)
-            .getPublicUrl(filePath)
+          // Prefer the URL returned by the upload endpoint, otherwise fall back to the bucket's public URL
+          const uploadedUrl = (uploaded as { url?: string } | null)?.url
+          const { data: pub } = supabase.storage.from(bucketName).getPublicUrl(filePath)
+          const publicUrl = uploadedUrl || pub.publicUrl
 
           return {
             name: file.name,
             message: undefined,
-            url: pub.publicUrl
+            url: publicUrl
           }
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Upload failed'

@@ -1,5 +1,21 @@
 type StorageResult<T> = { data: T | null; error: Error | null }
 
+const resolveBaseUrl = () => {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin
+  }
+
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL
+  }
+
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`
+  }
+
+  return ''
+}
+
 class LocalStorageBucket {
   constructor(private bucket: string) {}
 
@@ -45,8 +61,15 @@ class LocalStorageBucket {
   }
 
   getPublicUrl(path: string) {
+    const relativeUrl = `/uploads/${this.bucket}/${path}`.replace(/\\\\/g, '/').replace(/\/+/g, '/')
+    const baseUrl = resolveBaseUrl()
+
     return {
-      data: { publicUrl: `/uploads/${this.bucket}/${path}` },
+      data: {
+        publicUrl: baseUrl
+          ? new URL(relativeUrl, baseUrl).toString()
+          : relativeUrl,
+      },
       error: null,
     }
   }

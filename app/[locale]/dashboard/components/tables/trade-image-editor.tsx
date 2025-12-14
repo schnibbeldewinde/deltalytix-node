@@ -28,7 +28,6 @@ import { useHashUpload } from "@/hooks/use-hash-upload";
 import { toast } from "sonner";
 import { useI18n } from "@/locales/client";
 import { useUserStore } from "@/store/user-store";
-import Image from "next/image";
 import { createClient } from "@/lib/supabase";
 import { useData } from "@/context/data-provider";
 import {
@@ -51,6 +50,23 @@ const ACCEPTED_IMAGE_TYPES = [
   "image/webp",
 ];
 
+const extractStoragePath = (url: string | null | undefined) => {
+  if (!url) return null;
+
+  const supabasePrefix = "/storage/v1/object/public/trade-images/";
+  if (url.includes(supabasePrefix)) {
+    return url.split(supabasePrefix)[1];
+  }
+
+  const uploadsPrefix = "/uploads/trade-images/";
+  const uploadsIndex = url.indexOf(uploadsPrefix);
+  if (uploadsIndex !== -1) {
+    return url.slice(uploadsIndex + uploadsPrefix.length);
+  }
+
+  return null;
+};
+
 interface TradeImageEditorProps {
   trade: any;
   tradeIds: string[];
@@ -65,7 +81,6 @@ export function TradeImageEditor({ trade, tradeIds }: TradeImageEditorProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
-  const [imageToDelete, setImageToDelete] = useState<number | null>(null);
 
   // Use hash-based upload hook
   const uploadProps = useHashUpload({
@@ -134,18 +149,12 @@ export function TradeImageEditor({ trade, tradeIds }: TradeImageEditorProps) {
       await updateTrades(tradeIds, update);
 
       // Remove the image from Supabase storage
-      if (imageUrl) {
-        // Extract the path from the full URL
-        const path = imageUrl.split(
-          "/storage/v1/object/public/trade-images/",
-        )[1];
-        if (path) {
-          await supabase.storage.from("trade-images").remove([path]);
-        }
+      const storagePath = extractStoragePath(imageUrl);
+      if (storagePath) {
+        await supabase.storage.from("trade-images").remove([storagePath]);
       }
 
       toast.success("Image deleted successfully");
-      setImageToDelete(null);
     } catch (error) {
       console.error("Error removing image:", error);
       toast.error("Failed to delete image");
@@ -168,25 +177,21 @@ export function TradeImageEditor({ trade, tradeIds }: TradeImageEditorProps) {
       // From new images array
       if (trade.images && trade.images.length > 0) {
         trade.images.forEach((imageUrl: string) => {
-          const path = imageUrl.split(
-            "/storage/v1/object/public/trade-images/",
-          )[1];
-          if (path) imagesToRemove.push(path);
+          const storagePath = extractStoragePath(imageUrl);
+          if (storagePath) imagesToRemove.push(storagePath);
         });
       }
 
       // From legacy fields (in case they're not in the images array)
       if (trade.imageBase64) {
-        const path = trade.imageBase64.split(
-          "/storage/v1/object/public/trade-images/",
-        )[1];
-        if (path && !imagesToRemove.includes(path)) imagesToRemove.push(path);
+        const storagePath = extractStoragePath(trade.imageBase64);
+        if (storagePath && !imagesToRemove.includes(storagePath))
+          imagesToRemove.push(storagePath);
       }
       if (trade.imageBase64Second) {
-        const path = trade.imageBase64Second.split(
-          "/storage/v1/object/public/trade-images/",
-        )[1];
-        if (path && !imagesToRemove.includes(path)) imagesToRemove.push(path);
+        const storagePath = extractStoragePath(trade.imageBase64Second);
+        if (storagePath && !imagesToRemove.includes(storagePath))
+          imagesToRemove.push(storagePath);
       }
 
       if (imagesToRemove.length > 0) {
@@ -249,12 +254,13 @@ export function TradeImageEditor({ trade, tradeIds }: TradeImageEditorProps) {
               className="relative w-10 h-10 overflow-hidden rounded focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               aria-label="View image"
             >
-              <Image
+              <img
                 src={imageArray[0]}
                 alt="Trade image"
                 className="object-cover w-full h-full"
                 width={40}
                 height={40}
+                loading="lazy"
               />
               {imageArray.length > 1 && (
                 <span className="absolute bottom-1 right-1 bg-black/50 text-white text-xs px-1 rounded">
@@ -427,11 +433,12 @@ export function TradeImageEditor({ trade, tradeIds }: TradeImageEditorProps) {
                       className="relative aspect-square cursor-pointer"
                       onClick={() => handleThumbnailClick(index)}
                     >
-                      <Image
+                      <img
                         src={image}
                         alt={`Thumbnail ${index + 1}`}
-                        width={40}
-                        height={40}
+                        width={48}
+                        height={48}
+                        loading="lazy"
                         className={cn(
                           "object-cover w-12 h-12 rounded-md transition-all",
                           selectedImageIndex === index
@@ -496,11 +503,11 @@ export function TradeImageEditor({ trade, tradeIds }: TradeImageEditorProps) {
                   className="group relative flex items-center gap-4 p-3 rounded-lg border border-border bg-card hover:bg-accent/50 transition-colors duration-200"
                 >
                   <div className="relative w-24 h-24 rounded-md overflow-hidden flex-shrink-0 border border-border">
-                    <Image
+                    <img
                       src={imageUrl}
                       alt={`Trade image ${index + 1}`}
-                      fill
-                      className="object-cover"
+                      className="object-cover w-full h-full"
+                      loading="lazy"
                     />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -534,7 +541,6 @@ export function TradeImageEditor({ trade, tradeIds }: TradeImageEditorProps) {
               variant="outline"
               onClick={() => {
                 setShowDeleteConfirm(false);
-                setImageToDelete(null);
               }}
               className="w-full sm:w-auto transition-colors duration-200"
             >

@@ -4,6 +4,15 @@ import path from "path"
 
 export const dynamic = "force-dynamic"
 
+const resolveBaseUrl = (request: Request) => {
+  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL
+  if (process.env.SITE_URL) return process.env.SITE_URL
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
+
+  const { protocol, host } = new URL(request.url)
+  return `${protocol}//${host}`
+}
+
 export async function POST(request: Request) {
   const formData = await request.formData()
   const file = formData.get('file')
@@ -27,7 +36,9 @@ export async function POST(request: Request) {
   await fs.mkdir(path.dirname(fullPath), { recursive: true })
   await fs.writeFile(fullPath, buffer)
 
-  const publicUrl = `/uploads/${bucket}/${targetPath}`.replace(/\\\\/g, '/').replace(/\/+/g, '/')
+  const relativeUrl = `/uploads/${bucket}/${targetPath}`.replace(/\\\\/g, '/').replace(/\/+/g, '/')
+  const baseUrl = resolveBaseUrl(request)
+  const publicUrl = baseUrl ? new URL(relativeUrl, baseUrl).toString() : relativeUrl
 
   return NextResponse.json({ path: `${bucket}/${targetPath}`, url: publicUrl })
 }
