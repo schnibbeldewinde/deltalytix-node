@@ -4,13 +4,13 @@ import path from "path"
 
 export const dynamic = "force-dynamic"
 
-const resolveBaseUrl = (request: Request) => {
+const resolveBaseUrl = () => {
   if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL
   if (process.env.SITE_URL) return process.env.SITE_URL
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
 
-  const { protocol, host } = new URL(request.url)
-  return `${protocol}//${host}`
+  // Fallback to relative URLs so they survive tunnels/reverse proxies
+  return ''
 }
 
 export async function POST(request: Request) {
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
   await fs.writeFile(fullPath, buffer)
 
   const relativeUrl = `/uploads/${bucket}/${targetPath}`.replace(/\\\\/g, '/').replace(/\/+/g, '/')
-  const baseUrl = resolveBaseUrl(request)
+  const baseUrl = resolveBaseUrl()
   const publicUrl = baseUrl ? new URL(relativeUrl, baseUrl).toString() : relativeUrl
 
   return NextResponse.json({ path: `${bucket}/${targetPath}`, url: publicUrl })
